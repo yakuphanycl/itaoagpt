@@ -22,4 +22,4 @@ jobs:
       - name: Contract tests
         shell: pwsh
         run: |
-          pwsh -File .\tools\contract_tests.ps1
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\contract_tests.ps1
