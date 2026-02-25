@@ -3,3 +3,13 @@ __pycache__/
 *.pyc
 .env
 reports/
+
+# local outputs / temp
+report.json
+tmp_*.log
+
+# backups
+*.bak_*
+
+# python artifacts
+*.egg-info/
