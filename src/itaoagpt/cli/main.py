@@ -261,11 +261,32 @@ def cmd_analyze(
         # Human output MUST be derived from JSON output (single source of truth)
         print(render_human_from_json(out2))
 
-    # ---- EXIT CODE CONTRACT ----
+    fail_on = (fail_on or "").strip().lower()
+    if fail_on in ("none", "off", "false", "0") or fail_on not in SEV_RANK:
+        fail_on = ""
+
+    sev_rank = SEV_RANK
+    max_sev = None
+    for f in (out2.get("findings") or []):
+        sev = str(f.get("severity") or "").strip().lower()
+        if sev not in sev_rank:
+            continue
+        if max_sev is None or sev_rank[sev] > sev_rank[max_sev]:
+            max_sev = sev
+
+    # ------------------------------------------------------------
+    # EXIT CODE CONTRACT
     # analyze is informational unless --fail-on is explicitly used
-    if not fail_on or str(fail_on).strip().lower() in ("none", "off", "false", "0"):
-        return 0
-    return 2 if fail_on else 0
+    # ------------------------------------------------------------
+
+    if fail_on:
+        # fail-on threshold breached?
+        if max_sev is not None:
+            if sev_rank[max_sev] >= sev_rank[fail_on]:
+                return 2
+
+    # informational analyze (even if ERROR/CRITICAL exists)
+    return 0
 
 def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fail_on: str) -> int:
     p = Path(in_json).expanduser().resolve()
