@@ -82,8 +82,12 @@ Assert-True ($r.rc -eq 2) "fail-on low expected rc=2 got $($r.rc)"
 
 Write-Host "`nALL CONTRACT TESTS PASSED ✅" -ForegroundColor Green
 
+# 3.x) analyze exit code contract
 
+# analyze without fail-on MUST return 0
+$r = Run "$Exe analyze `"$Log`" --type log --json"
+Assert-True ($r.rc -eq 0) "analyze --json must return rc=0"
 
-
-
-
+# analyze with fail-on MUST return 2
+$r = Run "$Exe analyze `"$Log`" --type log --json --fail-on high"
+Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
