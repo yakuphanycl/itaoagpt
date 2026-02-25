@@ -261,7 +261,11 @@ def cmd_analyze(
         # Human output MUST be derived from JSON output (single source of truth)
         print(render_human_from_json(out2))
 
-    return _exit_code_from_fail_on(out2, fail_on)
+    # ---- EXIT CODE CONTRACT ----
+    # analyze is informational unless --fail-on is explicitly used
+    if not fail_on or str(fail_on).strip().lower() in ("none", "off", "false", "0"):
+        return 0
+    return 2 if fail_on else 0
 
 def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fail_on: str) -> int:
     p = Path(in_json).expanduser().resolve()
