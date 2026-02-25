@@ -1,6 +1,38 @@
 
 from __future__ import annotations
 
+# stdlib
+import sys
+import json
+import argparse
+import importlib.metadata as imd
+from pathlib import Path
+from typing import Any
+
+# severity ranking (single source of truth)
+SEV_RANK = {
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+}
+
+DETERMINISTIC_CREATED_AT = "1970-01-01T00:00:00Z"
+
+
+def _ensure_created_at(out: dict[str, Any], deterministic: bool = False) -> None:
+    if "created_at" in out:
+        return
+    if deterministic:
+        out["created_at"] = DETERMINISTIC_CREATED_AT
+        return
+    from datetime import datetime, timezone
+
+    out["created_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _dump_json(out: dict[str, Any], deterministic: bool = False) -> str:
+    return json.dumps(out, ensure_ascii=False, indent=2, sort_keys=deterministic)
+
 
 # --- FAIL-ON / EXIT-CODE CONTRACT HELPERS ---
 def _sev_rank(sev: str) -> int:
@@ -14,40 +46,38 @@ def _max_finding_severity(report: dict) -> str:
     inv = {1: "low", 2: "medium", 3: "high"}
     return inv.get(mx, "low")
 
-def _exit_code_from_fail_on(report: dict, fail_on: str | None) -> int:
+def _exit_code_from_fail_on(out: dict, fail_on: str) -> int:
     """
-    Contract:
-      - internal crash/exception => 3 (handled elsewhere)
-      - fail-on=high   => rc=2 if report has any high
-      - fail-on=medium => rc=2 if report has any medium OR high
-      - fail-on=low    => NEVER fail (rc=0)  (per current contract tests)
-      - fail_on None/"" => rc=0
+    fail_on semantics (threshold):
+      - high   -> rc=2 if any finding severity is high
+      - medium -> rc=2 if any finding severity is medium or high
+      - low    -> rc=2 if there is any finding at all
+      - none/empty -> rc=0 always
     """
-    fo = (fail_on or "").lower().strip()
-    if fo in ("", "none"):
-        return 0
-    if fo == "low":
+    if not fail_on:
         return 0
 
-    threshold = _sev_rank(fo)
-    if threshold <= 0:
+    fail_on = (fail_on or "").strip().lower()
+    if fail_on in ("none", "off", "false", "0"):
+        return 0
+    if fail_on not in ("low", "medium", "high"):
+        # keep CLI resilient; parser should already restrict, but don't crash
         return 0
 
-    mx = _sev_rank(_max_finding_severity(report))
-    return 2 if mx >= threshold else 0
-# --- END FAIL-ON / EXIT-CODE CONTRACT HELPERS ---
+    findings = (out.get("findings") or [])
+    if not findings:
+        return 0
 
+    # compute max severity present
+    max_rank = 0
+    for f in findings:
+        s = str(f.get("severity") or "").strip().lower()
+        max_rank = max(max_rank, SEV_RANK.get(s, 0))
 
-import argparse
-import json
-from importlib import metadata as imd
-import itaoagpt
-import sys
-from pathlib import Path
-from typing import Any
+    # threshold compare
+    threshold = SEV_RANK[fail_on]
+    return 2 if max_rank >= threshold else 0
 
-
-SEV_RANK = {"low": 1, "medium": 2, "high": 3}
 def _norm_sev(sev: str | None) -> str:
     s = (sev or "low").strip().lower()
     if s not in SEV_RANK:
@@ -169,7 +199,9 @@ def cmd_analyze(
     glob: str,
     max_lines: int,
     min_severity: str,
-    out_path: str | None, fail_on: str) -> int:
+    out_path: str | None,
+    fail_on: str,
+) -> int:
     p = Path(path_str).expanduser().resolve()
     if not p.exists():
         print(f"[ERR] path not found: {p}", file=sys.stderr)
@@ -190,16 +222,17 @@ def cmd_analyze(
     if not as_json and not as_text:
         as_text = True
 
-    # optionally write JSON to file
+    # optionally write JSON to file (raw engine result)
     if out_path:
         outp = Path(out_path).expanduser().resolve()
         outp.parent.mkdir(parents=True, exist_ok=True)
-        outp.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        outp.write_text(_dump_json(result, deterministic=deterministic), encoding="utf-8")
         print(f"[OK] wrote: {outp}")
-    # print to stdout
+
     # Build a "contract-safe" output object (used for stdout + fail-on decisions).
     out2 = dict(result)
     out2["findings"] = _filter_findings(result.get("findings", []) or [], min_severity)
+
     # normalize severity: treat any CRITICAL evidence as high (contract expectation)
     try:
         for f in (out2.get("findings") or []):
@@ -208,10 +241,9 @@ def cmd_analyze(
                 f["severity"] = "high"
     except Exception:
         pass
+
     # ensure created_at exists (contract)
-    if "created_at" not in out2:
-        from datetime import datetime, timezone
-        out2["created_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    _ensure_created_at(out2, deterministic=deterministic)
 
     # ensure input_summary exists (contract)
     if "input_summary" not in out2:
@@ -222,13 +254,15 @@ def cmd_analyze(
             "source": inp.get("source"),
         }
 
+    # stdout
     if as_json:
-        print(json.dumps(out2, ensure_ascii=False, indent=2))
-
+        print(_dump_json(out2, deterministic=deterministic))
     if as_text:
-        _print_text(result, min_severity)
+        # Human output MUST be derived from JSON output (single source of truth)
+        print(render_human_from_json(out2))
 
     return _exit_code_from_fail_on(out2, fail_on)
+
 def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fail_on: str) -> int:
     p = Path(in_json).expanduser().resolve()
     if not p.exists():
@@ -246,7 +280,8 @@ def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fa
         as_text = True
 
     out2 = dict(data)
-    out2["findings"] = _filter_findings(result.get("findings", []) or [], min_severity)
+    out2["findings"] = _filter_findings(out2.get("findings", []) or [], min_severity)
+
     # normalize severity: treat any CRITICAL evidence as high (contract expectation)
     try:
         for f in (out2.get("findings") or []):
@@ -255,10 +290,10 @@ def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fa
                 f["severity"] = "high"
     except Exception:
         pass
+
     # ensure created_at exists (contract)
-    if "created_at" not in out2:
-        from datetime import datetime, timezone
-        out2["created_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    _ensure_created_at(out2, deterministic=False)
+
     # ensure input_summary exists (contract)
     if "input_summary" not in out2:
         summ = out2.get("summary") or {}
@@ -267,38 +302,11 @@ def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fa
             "events": summ.get("events"),
             "source": inp.get("source"),
         }
+
     if as_text:
         print(render_human_from_json(out2))
     if as_json:
-        print(json.dumps(out2, ensure_ascii=False, indent=2))
-
-# --- FAIL-ON EXIT AFTER JSON ---
-        # If any evidence line contains 'CRITICAL', escalate that finding to high.
-        try:
-            for _f in (out2.get("findings") or []):
-                ev = _f.get("evidence") or []
-                if any(("CRITICAL" in str(x)) for x in ev):
-                    _f["severity"] = "high"
-        except Exception:
-            pass
-        
-        # Exit code contract for CI/automation
-        import sys as _sys
-    # normalize severity: treat any CRITICAL evidence as high (contract expectation)
-    try:
-        for f in (out2.get("findings") or []):
-            ev = " ".join((f.get("evidence") or []))
-            if "CRITICAL" in ev.upper():
-                f["severity"] = "high"
-    except Exception:
-        pass
-    # ensure created_at exists (contract)
-    if "created_at" not in out2:
-        from datetime import datetime, timezone
-        out2["created_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-    return _exit_code_from_fail_on(out2, fail_on)
-# --- END FAIL-ON EXIT AFTER JSON ---
+        print(_dump_json(out2, deterministic=False))
 
     return _exit_code_from_fail_on(out2, fail_on)
 def render_human_from_json(out: dict) -> str:
@@ -356,6 +364,14 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+
+
+
+
+
+
 
 
 

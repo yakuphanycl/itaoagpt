@@ -25,3 +25,8 @@ build/
 # python cache
 __pycache__/
 *.pyc
+
+# local outputs
+out.json
+out_gate.json
+
