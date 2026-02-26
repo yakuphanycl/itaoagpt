@@ -9,6 +9,8 @@ import importlib.metadata as imd
 from pathlib import Path
 from typing import Any
 
+import itaoagpt
+
 def _force_utf8_stdio() -> None:
     # Windows GitHub Actions default stdout encoding can be cp1252 -> breaks Turkish chars (İ, ğ, ş, ...)
     if sys.platform.startswith("win"):
@@ -45,16 +47,10 @@ def _dump_json(out: dict[str, Any], deterministic: bool = False) -> str:
 
 
 # --- FAIL-ON / EXIT-CODE CONTRACT HELPERS ---
-def _sev_rank(sev: str) -> int:
-    sev = (sev or "").lower().strip()
-    return {"low": 1, "medium": 2, "high": 3}.get(sev, 0)
+def _norm_sev(sev: str | None) -> str:
+    s = (sev or "low").strip().lower()
+    return s if s in SEV_RANK else "low"
 
-def _max_finding_severity(report: dict) -> str:
-    mx = 0
-    for f in (report.get("findings") or []):
-        mx = max(mx, _sev_rank(f.get("severity")))
-    inv = {1: "low", 2: "medium", 3: "high"}
-    return inv.get(mx, "low")
 
 def _exit_code_from_fail_on(out: dict, fail_on: str) -> int:
     """
@@ -81,39 +77,12 @@ def _exit_code_from_fail_on(out: dict, fail_on: str) -> int:
     # compute max severity present
     max_rank = 0
     for f in findings:
-        s = str(f.get("severity") or "").strip().lower()
-        max_rank = max(max_rank, SEV_RANK.get(s, 0))
+        s = _norm_sev(f.get("severity"))
+        max_rank = max(max_rank, SEV_RANK.get(s, 1))
 
     # threshold compare
     threshold = SEV_RANK[fail_on]
     return 2 if max_rank >= threshold else 0
-
-def _norm_sev(sev: str | None) -> str:
-    s = (sev or "low").strip().lower()
-    if s not in SEV_RANK:
-        return "low"
-    return s
-
-
-def _rank(sev: str | None) -> int:
-    return SEV_RANK.get(_norm_sev(sev), 1)
-
-
-def _should_fail(findings: list[dict[str, Any]], fail_on: str) -> bool:
-    fo = (fail_on or "none").strip().lower()
-    if fo == "none":
-        return False
-    if fo not in SEV_RANK:
-        fo = "none"
-    thr = SEV_RANK.get(fo, 999)
-    for f in findings or []:
-        if _rank(f.get("severity")) >= thr:
-            return True
-    return False
-
-def _norm_sev(s: str | None) -> str:
-    x = (s or "low").strip().lower()
-    return x if x in SEV_RANK else "low"
 
 
 def _filter_findings(findings: list[dict[str, Any]], min_severity: str) -> list[dict[str, Any]]:
@@ -124,6 +93,36 @@ def _filter_findings(findings: list[dict[str, Any]], min_severity: str) -> list[
         if SEV_RANK.get(sev, 1) >= SEV_RANK[m]:
             out.append(f)
     return out
+
+
+def _human_top_issues(out: dict[str, Any]) -> str | None:
+    stats = out.get("stats") or {}
+    top = stats.get("top_fingerprints") or []
+    if not top:
+        return None
+
+    items: list[str] = []
+    for it in top[:3]:
+        fp = (it.get("fp") or "")
+        cnt = it.get("count", 0)
+        if "|" in fp:
+            _, msg = fp.split("|", 1)
+        else:
+            msg = fp
+        msg = msg.replace("<num>", "N")
+        items.append(f"{msg} ({cnt})")
+
+    if not items:
+        return None
+    return "Top issues: " + ", ".join(items)
+
+
+def _human_unique_issues(out: dict[str, Any]) -> str | None:
+    stats = out.get("stats") or {}
+    count = stats.get("unique_fingerprints")
+    if count is None:
+        return None
+    return f"Unique issues: {count}"
 
 
 def _print_text(result: dict[str, Any], min_severity: str) -> None:
@@ -162,6 +161,11 @@ def _print_text(result: dict[str, Any], min_severity: str) -> None:
             for line in ev[:5]:
                 print(f"   - {line}")
 
+    top_line = _human_top_issues(result)
+    if top_line:
+        print("")
+        print(top_line)
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="itaoagpt", description="ItaoaGPT (CLI-first analysis tool)")
@@ -172,8 +176,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_an.add_argument("--type", dest="atype", default="log", help="Analyzer type (V0: log)")
     p_an.add_argument("--glob", default="*.log", help="When path is a directory: file glob to include (default: *.log)")
     p_an.add_argument("--max-lines", type=int, default=20000, help="Total max lines to read (V0 safety)")
-    p_an.add_argument("--min-severity", default="low", help="Filter findings: low|medium|high (default: low)")
-    p_an.add_argument("--fail-on", default="none", help="Exit non-zero if findings at/above: none|low|medium|high")
+    p_an.add_argument("--min-severity", default="low", choices=["low", "medium", "high"],
+                      help="Filter findings: low|medium|high (default: low)")
+    p_an.add_argument("--fail-on", default="none", choices=["none", "low", "medium", "high"],
+                      help="Exit non-zero if findings at/above: none|low|medium|high")
     p_an.add_argument("--out", default=None, help="Write JSON report to a file")
     p_an.add_argument("--json", action="store_true", help="Print JSON output to stdout")
     p_an.add_argument("--text", action="store_true", help="Print human-readable output to stdout")
@@ -181,8 +187,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_rep = sub.add_parser("report", help="Print a saved JSON report (from --out)")
     p_rep.add_argument("in_json", help="Path to report JSON")
-    p_rep.add_argument("--min-severity", default="low", help="Filter findings: low|medium|high (default: low)")
-    p_rep.add_argument("--fail-on", default="none", help="Exit non-zero if findings at/above: none|low|medium|high")
+    p_rep.add_argument("--min-severity", default="low", choices=["low", "medium", "high"],
+                       help="Filter findings: low|medium|high (default: low)")
+    p_rep.add_argument("--fail-on", default="none", choices=["none", "low", "medium", "high"],
+                       help="Exit non-zero if findings at/above: none|low|medium|high")
     p_rep.add_argument("--json", action="store_true", help="Print JSON output to stdout")
     p_rep.add_argument("--text", action="store_true", help="Print human-readable output to stdout")
 
@@ -195,7 +203,8 @@ def cmd_version() -> int:
     except Exception:
         ver = "0.0.0"
 
-    out = {"tool": "itaoagpt", "version": ver, "schema_version": "0.1"}
+    schema_version = itaoagpt.__schema_version__
+    out = {"tool": "itaoagpt", "version": ver, "schema_version": schema_version}
     print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0
 
@@ -361,6 +370,15 @@ def render_human_from_json(out: dict) -> str:
         sev = f.get("severity")
         title = f.get("title")
         lines.append(f"{i}. [{sev}] {title}")
+
+    unique_line = _human_unique_issues(out)
+    if unique_line:
+        lines.append("")
+        lines.append(unique_line)
+
+    top_line = _human_top_issues(out)
+    if top_line:
+        lines.append(top_line)
 
     return "\n".join(lines)
 
