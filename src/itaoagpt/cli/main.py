@@ -266,7 +266,8 @@ def cmd_analyze(
 
     # stdout
     if as_json:
-        print(_dump_json(out2, deterministic=deterministic))
+        data = _dump_json(out2, deterministic=deterministic)
+        sys.stdout.buffer.write((data + "\n").encode("utf-8"))
     if as_text:
         # Human output MUST be derived from JSON output (single source of truth)
         print(render_human_from_json(out2))
