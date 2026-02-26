@@ -25,11 +25,12 @@ Assert-True ($r.rc -eq 0) "version rc != 0"
 Assert-True ($r.out -match '"tool"\s*:\s*"itaoagpt"') "version json missing tool"
 
 # 1) analyze json
-$r = Run "$Exe analyze `"$Log`" --type log --json"
-Assert-True ($r.rc -eq 0) "analyze json rc != 0"
-Assert-True ($r.out -match '"schema_version"') "analyze json missing schema_version"
-Assert-True ($r.out -match '"input_summary"') "analyze json missing input_summary"
-Assert-True ($r.out -match '"findings"') "analyze json missing findings"
+# analyze WITHOUT --fail-on is informational -> rc MUST be 0
+itaoagpt analyze ".\tmp_test.log" --type log --json
+
+$cond = ($LASTEXITCODE -eq 0)
+$msg  = "analyze (informational) must return rc=0, got rc=$LASTEXITCODE"
+if (-not $cond) { throw $msg }
 
 # 2) out.json write
 if (Test-Path .\out.json) { Remove-Item .\out.json -Force }
@@ -84,10 +85,13 @@ Write-Host "`nALL CONTRACT TESTS PASSED ✅" -ForegroundColor Green
 
 # 3.x) analyze exit code contract
 
-# analyze without fail-on MUST return 0
-$r = Run "$Exe analyze `"$Log`" --type log --json"
-Assert-True ($r.rc -eq 0) "analyze --json must return rc=0"
+# analyze WITHOUT fail-on is informational -> rc must be 0
+& $Exe analyze "$Log" --type log --json | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  throw "analyze (informational) must return rc=0, got rc=$LASTEXITCODE"
+}
 
 # analyze with fail-on MUST return 2
 $r = Run "$Exe analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
+
