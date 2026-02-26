@@ -95,3 +95,6 @@ if ($LASTEXITCODE -ne 0) {
 $r = Run "$Exe analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
 
+# All asserts passed -> test script should succeed
+exit 0
+
