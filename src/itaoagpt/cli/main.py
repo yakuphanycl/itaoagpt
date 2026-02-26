@@ -9,6 +9,16 @@ import importlib.metadata as imd
 from pathlib import Path
 from typing import Any
 
+def _force_utf8_stdio() -> None:
+    # Windows GitHub Actions default stdout encoding can be cp1252 -> breaks Turkish chars (İ, ğ, ş, ...)
+    if sys.platform.startswith("win"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
+        except Exception:
+            # Some environments may not support reconfigure; ignore and continue.
+            pass
+
 # severity ranking (single source of truth)
 SEV_RANK = {
     "low": 1,
@@ -359,6 +369,7 @@ def render_human_report(out: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdio()
     args = build_parser().parse_args(argv)
 
     if args.cmd == "version":
