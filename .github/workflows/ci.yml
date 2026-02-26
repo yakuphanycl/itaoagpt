@@ -39,6 +39,9 @@ jobs:
           .\tools\release_check.ps1
 
       - name: Run release_check (wheel gate)
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         shell: pwsh
+        env:
+          WHEEL: "1"
         run: |
-          .\tools\release_check.ps1 -Wheel
+          .\tools\release_check.ps1
