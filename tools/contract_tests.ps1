@@ -84,6 +84,21 @@ function Run($cmd) {
 try {
 $Runner = Resolve-Runner
 
+# Repo root'tan çalıştırma sözleşmesi
+if (-not (Test-Path ".\pyproject.toml")) {
+  throw "Run contract_tests.ps1 from repo root (pyproject.toml not found)."
+}
+
+$log = Join-Path (Get-Location).Path "tmp_test.log"
+
+@'
+2026-02-24 11:00:00 INFO boot
+2026-02-24 11:00:01 ERROR db timeout after 2000ms
+2026-02-24 11:00:02 CRITICAL out of memory at 0xDEADBEEF
+2026-02-24 11:00:03 WARN retrying
+2026-02-24 11:00:05 ERROR db timeout after 3000ms
+'@ | Set-Content -LiteralPath $log -Encoding utf8
+
 # 0) basic: help/version
 $r = Run "$Runner version"
 Assert-True ($r.rc -eq 0) "version rc != 0"
@@ -130,7 +145,7 @@ Assert-True ($r.out -match "Top issues:") "human text missing Top issues line"
 Assert-True ($r.out -match "\(\d+\)") "human text missing issue count format"
 
 # --- TEXT OUTPUT CONTRACT (human summary must exist) ---
-$outText = (python -m itaoagpt.cli.main analyze ".\tmp_test.log" --type log --text) -join "`n"
+$outText = (python -m itaoagpt.cli.main analyze "$log" --type log --text) -join "`n"
 if ($outText -notmatch "By level:") { throw "missing human summary: By level" }
 if ($outText -notmatch "Top issues:") { throw "missing human summary: Top issues" }
 
