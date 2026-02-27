@@ -1,5 +1,6 @@
 from __future__ import annotations
 from itaoagpt.core.analyzers.log import analyze_log
+from itaoagpt.core.triage import build_triage
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,11 +40,19 @@ def run_analysis(
 
     # Delegate to log analyzer.
     # If analyze_log does not accept these yet, adapt here.
-    return analyze_log(
+    out = analyze_log(
         p,
         max_lines=max_lines,
         min_severity=min_severity,
         deterministic=deterministic,
         debug=debug,
     )
+
+    out["triage"] = build_triage(
+        stats=out.get("stats"),
+        top_fingerprints=out.get("top_fingerprints"),
+        findings=out.get("findings"),
+    )
+
+    return out
 

@@ -30,24 +30,28 @@ def build_triage(
     # confidence: based on volume of observed events
     if total_events == 0:
         confidence = 0.0
+        confidence_label = "none"
     elif total_events < 50:
         confidence = 0.4
+        confidence_label = "low"
     elif total_events < 500:
         confidence = 0.7
+        confidence_label = "medium"
     else:
         confidence = 1.0
+        confidence_label = "high"
 
-    # summary: single-line human label
+    # summary: single-line human label (ASCII separators for terminal safety)
     summary = (
         f"{finding_count} finding{'s' if finding_count != 1 else ''}"
-        f" · max: {max_sev}"
-        f" · {total_events} events"
-        f" · {unique_fps} unique patterns"
+        f" | max: {max_sev}"
+        f" | {total_events} events"
+        f" | {unique_fps} unique patterns"
     )
 
-    # top_issues: formatted strings from top_fingerprints
+    # top_issues: formatted strings from top_fingerprints, capped at 3
     top_issues: list[str] = []
-    for t in _fps[:5]:
+    for t in _fps[:3]:
         fp = t.get("fingerprint", "?")
         cnt = t.get("count", 0)
         sev = t.get("severity", "low")
@@ -60,6 +64,7 @@ def build_triage(
         "unique_fingerprints": unique_fps,
         "top_fingerprints": _fps[:3],
         "confidence": confidence,
+        "confidence_label": confidence_label,
         "summary": summary,
         "top_issues": top_issues,
     }
