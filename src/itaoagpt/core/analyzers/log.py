@@ -1,22 +1,14 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 import re
-from collections import Counter
 from typing import Any
 
 
 _SEV_RANK = {"low": 1, "medium": 2, "high": 3}
-_LEVEL_TO_SEV = {
-    "DEBUG": "low",
-    "INFO": "low",
-    "WARN": "medium",
-    "WARNING": "medium",
-    "ERROR": "high",
-    "CRITICAL": "high",
-    "FATAL": "high",
-}
+_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 _RE_MS = re.compile(r"\b\d+ms\b")
 _RE_INT = re.compile(r"\b\d+\b")
@@ -30,25 +22,60 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _normalize_fingerprint(msg: str) -> str:
+    s = msg.strip()
+    s = _RE_HEX.sub("<HEX>", s)
+    s = _RE_INT.sub("<N>", s)
+    if len(s) > 160:
+        s = s[:160].rstrip() + "..."
+    return s
+
+
+def _sev_from_level(level: str) -> str:
+    if level in ("ERROR", "CRITICAL"):
+        return "high"
+    if level == "WARNING":
+        return "medium"
+    return "low"
+
+
+def _max_sev(sevs: list[str]) -> str:
+    rank = {"low": 1, "medium": 2, "high": 3}
+    best = "low"
+    for sev in sevs:
+        if rank.get(sev, 1) > rank[best]:
+            best = sev
+    return best
+
+
 def _fingerprint_text(msg: str) -> str:
     s = msg.strip()
     s = _RE_UUID.sub("<uuid>", s)
-    s = _RE_HEX.sub("<hex>", s)
     s = _RE_IP.sub("<ip>", s)
-    s = _RE_MS.sub("<num>ms", s)
-    s = _RE_INT.sub("<num>", s)
+    s = _RE_MS.sub("<N>ms", s)
     s = _RE_WS.sub(" ", s)
-    return s
+    return _normalize_fingerprint(s)
+
+
+def _normalize_level(level: str | None) -> str | None:
+    if not level:
+        return None
+    norm = level.strip().upper()
+    if norm == "WARN":
+        norm = "WARNING"
+    elif norm == "FATAL":
+        norm = "CRITICAL"
+    return norm if norm in _LEVELS else None
 
 
 def _extract_level_and_message(line: str) -> tuple[str | None, str]:
     """
-    Beklenen örnek: "2026-02-24 11:00:02 ERROR db timeout after 2000ms"
-    Eğer level yakalanamazsa (None, line) döner.
+    Beklenen ornek: "2026-02-24 11:00:02 ERROR db timeout after 2000ms"
+    Eger level yakalanamazsa (None, line) doner.
     """
     parts = line.strip().split()
     if len(parts) >= 4:
-        level = parts[2].upper()
+        level = _normalize_level(parts[2])
         msg = " ".join(parts[3:])
         return level, msg
     return None, line.strip()
@@ -60,6 +87,7 @@ def analyze_log(
     *,
     max_lines: int | None = None,
     min_severity: str | None = None,
+    debug: bool = False,
 ) -> dict[str, Any]:
     """
     V0 log analyzer.
@@ -71,40 +99,38 @@ def analyze_log(
     p = Path(path)
 
     if not p.exists():
-        return {
+        by_level_out = {k: 0 for k in _LEVELS}
+        out: dict[str, Any] = {
             "tool": "itaoagpt",
             "version": "0.1.0",
             "schema_version": "0.1",
             "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
             "input_summary": {"events": 0, "source": None},
-            "by_level": {},
+            "by_level": by_level_out,
             "stats": {
                 "total": 0,
-                "high": 0,
-                "medium": 0,
-                "low": 0,
-                "unknown": 0,
-                "by_level": {},
-                "unique_fingerprints": 0,
-                "total_lines": 0,
-                "top_fingerprints": [],
+                "by_level": by_level_out,
+                "counts": {
+                    "unique_fingerprints": 0,
+                },
             },
+            "top_fingerprints": [],
             "findings": [
                 {
                     "kind": "input_error",
                     "severity": "high",
                     "title": f"log file not found: {str(p)}",
                     "evidence": [],
-                    "hint": "Verilen path doğru mu? Dosya gerçekten var mı?",
+                    "hint": "Verilen path dogru mu? Dosya gercekten var mi?",
                 }
             ],
         }
+        if debug and not deterministic:
+            out["debug_meta"] = {"lines_read": 0, "min_severity": None}
+        return out
 
-    # Normalize knobs
     ms = (min_severity or "low").strip().lower()
-    if ms not in _SEV_RANK:
-        ms = "low"
-    ms_rank = _SEV_RANK[ms]
+    ms_rank = _SEV_RANK.get(ms, 1)
 
     events = p.read_text(encoding="utf-8", errors="replace").splitlines()
     if max_lines is not None and max_lines > 0:
@@ -112,24 +138,28 @@ def analyze_log(
 
     total = len(events)
 
-    # Collect evidence lines by severity
     high_hits: list[str] = []
     med_hits: list[str] = []
     low_hits: list[str] = []
     by_level: Counter[str] = Counter()
     fp_counter: Counter[str] = Counter()
-    fp_examples: dict[str, str] = {}
+    fp_sev: dict[str, str] = {}
 
     for line in events:
         level, msg = _extract_level_and_message(line)
-        sev = _LEVEL_TO_SEV.get(level or "INFO", "low")
-        if level:
-            by_level[level] += 1
-            if level in ("WARN", "ERROR", "CRITICAL"):
-                fp = f"{level}|{_fingerprint_text(msg)}"
-                fp_counter[fp] += 1
-                if fp not in fp_examples:
-                    fp_examples[fp] = line
+        level = level or "INFO"
+        if level not in _LEVELS:
+            level = "INFO"
+
+        msg = (msg or line).strip()
+        sev = _sev_from_level(level)
+
+        by_level[level] += 1
+
+        fp = _fingerprint_text(msg)
+        fp_counter[fp] += 1
+        prev = fp_sev.get(fp)
+        fp_sev[fp] = sev if prev is None else _max_sev([prev, sev])
 
         if sev == "high":
             high_hits.append(line)
@@ -140,7 +170,6 @@ def analyze_log(
 
     findings: list[dict[str, Any]] = []
 
-    # Findings: high severity
     if _SEV_RANK["high"] >= ms_rank and high_hits:
         findings.append(
             {
@@ -148,11 +177,10 @@ def analyze_log(
                 "severity": "high",
                 "title": f"ERROR/CRITICAL tespit edildi: {len(high_hits)} adet",
                 "evidence": high_hits[:5],
-                "hint": "İlk görünen high-severity hatadan başlayıp aynı request/trace akışını takip et.",
+                "hint": "Ilk gorunen high-severity hatadan baslayip ayni request/trace akisina bak.",
             }
         )
 
-    # Findings: medium severity
     if _SEV_RANK["medium"] >= ms_rank and med_hits:
         findings.append(
             {
@@ -160,57 +188,60 @@ def analyze_log(
                 "severity": "medium",
                 "title": f"WARN tespit edildi: {len(med_hits)} adet",
                 "evidence": med_hits[:5],
-                "hint": "WARN'lar genelde gelecekteki ERROR'ların habercisi. Cache/timeout/limit izleri var mı bak.",
+                "hint": "WARN kayitlari genelde gelecekteki ERROR'larin habercisi olur.",
             }
         )
 
-    # If nothing found above threshold, add a calm finding
     if not findings:
         findings.append(
             {
                 "kind": "no_findings_above_threshold",
                 "severity": "low",
-                "title": f"'{ms}' eşiğinin üstünde bulgu yok",
+                "title": f"'{ms}' esiginin ustunde bulgu yok",
                 "evidence": [],
-                "hint": "Eşik değerini düşürerek (low) tekrar deneyebilirsin.",
+                "hint": "Esik degerini dusurerek (low) tekrar deneyebilirsin.",
             }
         )
 
+    _ = _max_sev([str(f.get("severity", "low")) for f in findings])
+
     top_fingerprints = []
-    for fp, cnt in fp_counter.most_common(5):
+    for fp, cnt in fp_counter.most_common(10):
+        sev = fp_sev.get(fp, "low")
         top_fingerprints.append({
-            "fp": fp,
+            "fingerprint": fp,
             "count": int(cnt),
-            "example": fp_examples.get(fp),
+            "severity": sev,
         })
 
-    high_lvls = {"ERROR", "CRITICAL"}
-    medium_lvls = {"WARN", "WARNING"}
-    low_lvls = {"INFO", "DEBUG", "TRACE"}
-    high = sum(by_level.get(k, 0) for k in high_lvls)
-    medium = sum(by_level.get(k, 0) for k in medium_lvls)
-    low = sum(by_level.get(k, 0) for k in low_lvls)
-    unknown = int(by_level.get("UNKNOWN", 0))
-    by_level_out = dict(sorted(by_level.items()))
+    if min_severity:
+        ms = (min_severity or "low").strip().lower()
+        ms_rank = _SEV_RANK.get(ms, 1)
+        top_fingerprints = [
+            fp for fp in top_fingerprints
+            if _SEV_RANK.get(fp["severity"], 1) >= ms_rank
+        ]
 
-    return {
+    by_level_out = {k: int(by_level.get(k, 0)) for k in _LEVELS}
+    stats = {
+        "total": int(total),
+        "by_level": by_level_out,
+        "counts": {
+            "unique_fingerprints": int(len(fp_counter)),
+        },
+    }
+
+    result: dict[str, Any] = {
         "tool": "itaoagpt",
         "version": "0.1.0",
         "schema_version": "0.1",
         "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
         "input_summary": {"events": total, "source": None},
         "by_level": by_level_out,
-        "stats": {
-            "total": int(sum(by_level.values())),
-            "high": int(high),
-            "medium": int(medium),
-            "low": int(low),
-            "unknown": int(unknown),
-            "by_level": by_level_out,
-            "unique_fingerprints": len(fp_counter),
-            "total_lines": total,
-            "top_fingerprints": top_fingerprints,
-        },
+        "stats": stats,
+        "top_fingerprints": top_fingerprints,
         "findings": findings,
     }
-
+    if debug and not deterministic:
+        result["debug_meta"] = {"lines_read": total, "min_severity": ms}
+    return result
