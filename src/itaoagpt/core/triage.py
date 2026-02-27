@@ -1,8 +1,30 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 _SEV_RANK: dict[str, int] = {"low": 1, "medium": 2, "high": 3}
+
+_ACTION_RULES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"timeout", re.I), "DB timeout/pool/latency kontrolu"),
+    (re.compile(r"out of memory|oom", re.I), "memory limit/leak/payload size"),
+    (re.compile(r"retry", re.I), "upstream instability, backoff/retry policy"),
+    (re.compile(r"connection refused", re.I), "servis ayakta mi? port/firewall"),
+    (re.compile(r"critical", re.I), "crash dump / core / immediate rollback opsiyonu"),
+]
+
+
+def _actions_from_issues(top_issues: list[str]) -> list[str]:
+    seen: set[str] = set()
+    actions: list[str] = []
+    for issue in top_issues:
+        for pattern, action in _ACTION_RULES:
+            if pattern.search(issue) and action not in seen:
+                seen.add(action)
+                actions.append(action)
+                if len(actions) == 3:
+                    return actions
+    return actions
 
 
 def build_triage(
@@ -57,6 +79,8 @@ def build_triage(
         sev = t.get("severity", "low")
         top_issues.append(f"[{sev}] {fp} ({cnt})")
 
+    actions = _actions_from_issues(top_issues)
+
     return {
         "max_severity": max_sev,
         "finding_count": finding_count,
@@ -67,4 +91,5 @@ def build_triage(
         "confidence_label": confidence_label,
         "summary": summary,
         "top_issues": top_issues,
+        "actions": actions,
     }

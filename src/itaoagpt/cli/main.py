@@ -405,6 +405,11 @@ def render_human_from_json(out: dict) -> str:
             lines.append("Top issues:")
             for issue in top_issues:
                 lines.append(f"  {issue}")
+        actions = triage.get("actions") or []
+        if actions:
+            lines.append("Actions:")
+            for action in actions:
+                lines.append(f"  - {action}")
     else:
         # fallback: V0.1 path (no triage in out)
         tops = out.get("top_fingerprints") or []

@@ -120,7 +120,7 @@ Assert-True ($r.rc -eq 2) "fail-on medium expected rc=2 got $($r.rc)"
 $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on low"
 Assert-True ($r.rc -eq 2) "fail-on low expected rc=2 got $($r.rc)"
 
-Write-Host "`nALL CONTRACT TESTS PASSED ?" -ForegroundColor Green
+Write-Host "`nALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 
 # 5) analyze exit code contract
 $r = Run "$Runner analyze `"$Log`" --type log --json"
