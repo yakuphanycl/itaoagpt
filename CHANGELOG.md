@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.4] — 2026-02-28
+
+### Fixed
+- `release.ps1`: `| Out-Null` was silently swallowing `gh create/edit` errors;
+  replaced with `$LASTEXITCODE` check — failures now surface immediately
+
+---
+
 ## [0.4.3] — 2026-02-28
 
 ### Added
