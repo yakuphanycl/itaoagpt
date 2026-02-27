@@ -1,36 +1,107 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## v0.4.2
+---
 
-**Changes:**
+## [0.4.2] — 2026-02-27
 
-- release: v0.1.0 (6bad911)
-- feat(triage): deterministic keyword actions; strengthen contract for actions (f893a14)
-- chore(tests): make contract_tests self-contained; remove unused vars (eca1471)
-- fix(contract): robust JSON parse in PS; align triage total_events with events (59cfee3)
-- feat(v0.2): define lines/events semantics; count parsed events; contract asserts (d5aac33)
+### Added
+- `src/itaoagpt/core/fingerprint.py`: new `normalize_message()` pipeline masks
+  UUID / HEX / IPv4 / EMAIL / 2+ digit numbers in deterministic order
+- `tools/release.ps1`: create-or-edit GitHub release with tag/version guard
+  and working-tree cleanliness check
 
-## v0.4.1
+### Changed
+- `triage.top_fingerprints` is the single canonical source for fingerprint data;
+  root-level `top_fingerprints` and `triage.top_fp` removed
+- Version now read from `importlib.metadata.version("itaoagpt")` in engine and
+  log analyzer — no more hardcoded `"0.1.0"` in JSON output
+- Confidence formula documented in-code with threshold table
 
-**Changes:**
+### Fixed
+- BOM (`\ufeff`) stripped from first log line — prevents parse miss on
+  Windows-encoded files
 
-- test: add typed JSON asserts; expose lines/events + stats in human output (b7be903)
+---
 
-## v0.4.0
+## [0.4.1] — 2026-02-27
 
-**Changes:**
+### Changed
+- Typed JSON assertions in contract tests (`input_summary`, `stats.by_level`,
+  `unique_fingerprints`) — previously only string-match checks
 
-- feat(v0.4): stable fingerprint sort; derive actions/top_issues from top_fp (non-breaking) (ba50420)
+---
 
-## v0.3.0
+## [0.4.0] — 2026-02-27
 
-**Changes:**
+### Added
+- Stable, deterministic fingerprint sort: count desc → severity desc → fingerprint asc
+- `triage.actions` derived from `top_fingerprints` via keyword map (no raw string parsing)
 
-- feat(v0.3): add fingerprint sample/levels; add triage.top_fp (non-breaking) (5692eec)
+---
 
-## v0.2.1
+## [0.3.0] — 2026-02-27
 
-- (oldest tag in this file)
+### Added
+- `fingerprint.sample`: first raw log line that produced the fingerprint
+- `fingerprint.levels`: per-level breakdown (ERROR/WARNING/…) per fingerprint
+- `triage.top_fp`: structured top-fingerprint list (later superseded by `triage.top_fingerprints`)
 
+---
+
+## [0.2.1] — 2026-02-27
+
+### Added
+- `triage.summary`: single-line human label (findings / max severity / event count)
+- `triage.confidence` + `confidence_label`: volume-based confidence score
+- `triage.top_issues`: formatted strings for human display (deprecated as of 0.4.2)
+- `triage.actions`: up to 3 deterministic actions derived from keyword map
+
+---
+
+## [0.2.0] — 2026-02-27
+
+### Added
+- `stats.by_level`: per-level event counts in JSON output
+- `stats.counts.unique_fingerprints`: distinct fingerprint count
+- `top_fingerprints`: top-10 fingerprints with count and severity
+- `input_summary.lines` / `input_summary.events`: raw line count vs parsed event count
+- CI: GitHub Actions wheel smoke test + contract tests on push and tags
+
+### Fixed
+- UTF-8 stdout/stderr forced on Windows (avoids cp1252 UnicodeEncodeError)
+- `analyze` exit code is now informational (rc=0) unless `--fail-on` is set
+
+---
+
+## [0.1.2] — 2026-02-27
+
+### Changed
+- Triage actions derived deterministically from keyword→action map (capped at 3)
+- Contract strengthened: `triage.actions` must be a non-empty array of non-empty strings
+
+---
+
+## [0.1.1] — 2026-02-27
+
+### Fixed
+- Robust JSON parse in PowerShell contract tests (UTF-8 safe, handles string arrays)
+- `triage.total_events` aligned with `input_summary.lines`
+- Contract tests made self-contained (no external fixtures)
+
+---
+
+## [0.1.0] — 2026-02-26
+
+### Added
+- Initial release: `itaoagpt analyze` command with `--type log`
+- Log analyzer: best-effort line parsing, severity classification (high/medium/low)
+- `--fail-on` exit code contract (rc=2 on threshold breach)
+- `--min-severity` finding filter
+- `--deterministic` mode for repeatable output
+- `--json` / `--text` output modes; `--out` for file write
+- `itaoagpt version` command (reads from package metadata)
+- `tools/contract_tests.ps1`: PowerShell contract test suite
+- `tools/release_check.ps1`: wheel build + reinstall smoke test
