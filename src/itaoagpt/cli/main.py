@@ -370,8 +370,10 @@ def render_human_from_json(out: dict) -> str:
     # 1. Header
     lines.append("ItaoaGPT")
 
-    # 2. Events / Source
+    # 2. Events / Source / Lines
     lines.append(f"Events: {inp.get('events')}")
+    if inp.get("lines") is not None:
+        lines.append(f"Lines: {inp.get('lines')}")
     lines.append(f"Source: {inp.get('source')}")
 
     # 3. Unique issues
@@ -379,12 +381,16 @@ def render_human_from_json(out: dict) -> str:
     if uniq is not None:
         lines.append(f"Unique issues: {uniq}")
 
-    # 4. By level
+    # 4. By level + severity aggregation
     by_level = stats.get("by_level") or out.get("by_level") or {}
     if by_level:
         order = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         parts = [f"{k}={int(by_level.get(k, 0))}" for k in order]
         lines.append("By level: " + " ".join(parts))
+        high = int(by_level.get("ERROR", 0)) + int(by_level.get("CRITICAL", 0))
+        medium = int(by_level.get("WARNING", 0))
+        low = int(by_level.get("DEBUG", 0)) + int(by_level.get("INFO", 0))
+        lines.append(f"Severity: high={high} medium={medium} low={low}")
 
     # 5. Findings
     lines.append("")

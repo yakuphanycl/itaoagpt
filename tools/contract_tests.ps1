@@ -3,7 +3,40 @@ param(
   [string]$Log = ".\tmp_test.log"
 )
 
+# Fail fast: herhangi bir hata scripti dusursun
 $ErrorActionPreference = "Stop"
+
+function Get-Json {
+  param(
+    [Parameter(Mandatory=$true)]
+    [string] $Text
+  )
+
+  try {
+    return ($Text | ConvertFrom-Json -Depth 50)
+  } catch {
+    throw "ConvertFrom-Json failed. Raw output was:`n$Text"
+  }
+}
+
+function Assert-HasPath {
+  param(
+    [Parameter(Mandatory=$true)] $Obj,
+    [Parameter(Mandatory=$true)] [string] $Path
+  )
+
+  $cur = $Obj
+  foreach ($k in ($Path -split '\.')) {
+    if ($null -eq $cur) { throw "Missing JSON path: $Path (null at '$k')" }
+
+    # PSObject property check
+    $p = $cur.PSObject.Properties[$k]
+    if ($null -eq $p) { throw "Missing JSON path: $Path (no property '$k')" }
+
+    $cur = $p.Value
+  }
+  return $cur
+}
 
 function Assert-True($cond, $msg) {
   if (-not $cond) { throw $msg }
@@ -23,6 +56,7 @@ function Run($cmd) {
   return @{ rc = $rc; out = ($out | Out-String) }
 }
 
+try {
 $Runner = Resolve-Runner
 
 # 0) basic: help/version
@@ -41,6 +75,9 @@ Assert-True ($r.out -match '"total"\s*:') "json missing stats.total"
 Assert-True ($r.out -match '"top_fingerprints"\s*:') "json missing stats.top_fingerprints"
 Assert-True ($r.out -match '"confidence_label"\s*:') "json missing triage.confidence_label"
 Assert-True ($r.out -match '"actions"\s*:') "json missing triage.actions"
+$o = Get-Json $r.out
+Assert-True ($null -ne $o.input_summary.lines) "json missing input_summary.lines"
+Assert-True ($null -ne $o.stats.by_level) "json missing stats.by_level (nested)"
 
 # 2) out.json write
 if (Test-Path .\out.json) { Remove-Item .\out.json -Force }
@@ -64,13 +101,6 @@ Assert-True ($r.out -match "\(\d+\)") "human text missing issue count format"
 $outText = (python -m itaoagpt.cli.main analyze ".\tmp_test.log" --type log --text) -join "`n"
 if ($outText -notmatch "By level:") { throw "missing human summary: By level" }
 if ($outText -notmatch "Top issues:") { throw "missing human summary: Top issues" }
-
-function Get-Json($s) {
-  if ($null -eq $s -or $s.Trim().Length -eq 0) {
-    throw "Empty JSON output"
-  }
-  try { return ($s | ConvertFrom-Json) } catch { throw "Invalid JSON output" }
-}
 
 function Get-FindingSeverities($outObj) {
   if (-not $outObj.findings) { return @() }
@@ -121,8 +151,6 @@ Assert-True ($r.rc -eq 2) "fail-on medium expected rc=2 got $($r.rc)"
 $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on low"
 Assert-True ($r.rc -eq 2) "fail-on low expected rc=2 got $($r.rc)"
 
-Write-Host "`nALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
-
 # 5) analyze exit code contract
 $r = Run "$Runner analyze `"$Log`" --type log --json"
 Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r.rc)"
@@ -130,4 +158,10 @@ Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r
 $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
 
+Write-Host "ALL CONTRACT TESTS PASSED ✅" -ForegroundColor Green
 exit 0
+} catch {
+  Write-Host "Contract tests failed ❌" -ForegroundColor Red
+  Write-Host $_.Exception.Message
+  exit 1
+}
