@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.5.0] — 2026-02-28
+
+Minor version milestone — consolidates all 0.4.x work into a stable baseline.
+
+### Summary of 0.4.x → 0.5.0
+- `fingerprint.py`: `normalize_message()` pipeline (UUID / HEX / IPv4 / EMAIL / 2+ digit numbers)
+- `triage.top_fingerprints`: single canonical source; root duplicate and `top_fp` removed
+- Version read from `importlib.metadata` — hardcoded `"0.1.0"` eliminated
+- BOM (`\ufeff`) stripped from first log line
+- Contract tests: version + editable install sanity gates (A1 / A2 / B)
+- `release.ps1`: tag/version/working-tree/editable guards; `$LASTEXITCODE` error surfacing
+
+---
+
 ## [0.4.5] — 2026-02-28
 
 ### Changed
