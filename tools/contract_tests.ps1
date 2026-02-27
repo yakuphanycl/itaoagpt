@@ -67,6 +67,10 @@ function Assert-True($cond, $msg) {
   if (-not $cond) { throw $msg }
 }
 
+function Assert($cond, $msg) {
+  if (-not $cond) { throw $msg }
+}
+
 function Resolve-Runner() {
   if ($Exe) { return $Exe }
 
@@ -231,6 +235,11 @@ Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r
 
 $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
+
+# --- A3: version consistency gate (CLI vs metadata) ---
+$cliVer = (python -m itaoagpt.cli.main version | ConvertFrom-Json).version
+$metaVer = (python -c "import importlib.metadata as imd; print(imd.version('itaoagpt'))" | Out-String).Trim()
+Assert ($cliVer -eq $metaVer) "version mismatch: cli=$cliVer metadata=$metaVer"
 
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
