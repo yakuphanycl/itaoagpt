@@ -14,12 +14,14 @@ _ACTION_RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
-def _actions_from_issues(top_issues: list[str]) -> list[str]:
+def _actions_from_top_fp(top_fp: list[dict[str, Any]]) -> list[str]:
+    """Derive actions from structured top_fp (no string parsing)."""
     seen: set[str] = set()
     actions: list[str] = []
-    for issue in top_issues:
+    for t in top_fp:
+        text = t.get("fingerprint", "")
         for pattern, action in _ACTION_RULES:
-            if pattern.search(issue) and action not in seen:
+            if pattern.search(text) and action not in seen:
                 seen.add(action)
                 actions.append(action)
                 if len(actions) == 3:
@@ -71,16 +73,7 @@ def build_triage(
         f" | {unique_fps} unique patterns"
     )
 
-    # top_issues: formatted strings from top_fingerprints, capped at 3
-    top_issues: list[str] = []
-    for t in _fps[:3]:
-        fp = t.get("fingerprint", "?")
-        cnt = t.get("count", 0)
-        sev = t.get("severity", "low")
-        top_issues.append(f"[{sev}] {fp} ({cnt})")
-
-    actions = _actions_from_issues(top_issues)
-
+    # top_fp: primary structured field (V0.4+)
     top_fp = [
         {
             "fingerprint": t.get("fingerprint", "?"),
@@ -89,6 +82,16 @@ def build_triage(
             "sample": t.get("sample", ""),
         }
         for t in _fps[:3]
+    ]
+
+    # actions derived from top_fp (structured — no string parsing)
+    actions = _actions_from_top_fp(top_fp)
+
+    # top_issues: formatted strings for human display
+    # DEPRECATED: primary as of V0.4, deprecated in V0.5, removal candidate in V1.0
+    top_issues: list[str] = [
+        f"[{t['severity']}] {t['fingerprint']} ({t['count']})"
+        for t in top_fp
     ]
 
     return {
@@ -100,7 +103,7 @@ def build_triage(
         "confidence": confidence,
         "confidence_label": confidence_label,
         "summary": summary,
-        "top_issues": top_issues,
-        "top_fp": top_fp,
+        "top_fp": top_fp,           # primary (V0.4+)
+        "top_issues": top_issues,   # deprecated V0.5, removal candidate V1.0
         "actions": actions,
     }

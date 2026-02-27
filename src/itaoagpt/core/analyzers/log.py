@@ -212,8 +212,13 @@ def analyze_log(
 
     _ = _max_sev([str(f.get("severity", "low")) for f in findings])
 
+    # sort: count desc, severity desc, fingerprint asc — fully deterministic
+    sorted_fps = sorted(
+        fp_counter.items(),
+        key=lambda item: (-item[1], -_SEV_RANK.get(fp_sev.get(item[0], "low"), 1), item[0]),
+    )
     top_fingerprints = []
-    for fp, cnt in fp_counter.most_common(10):
+    for fp, cnt in sorted_fps[:10]:
         sev = fp_sev.get(fp, "low")
         top_fingerprints.append({
             "fingerprint": fp,
