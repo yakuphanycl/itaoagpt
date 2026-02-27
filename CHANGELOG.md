@@ -24,6 +24,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - BOM (`\ufeff`) stripped from first log line — prevents parse miss on
   Windows-encoded files
 
+### Tooling
+- `tools/contract_tests.ps1`: version + editable install sanity gates
+  (A1: CLI JSON version matches git tag; A2: `importlib.metadata` matches;
+  B: import must come from `src/`, not site-packages)
+- `tools/release.ps1`: refuses release if package imports from site-packages
+- Expected version auto-derived from `git describe --tags` — no hardcoding
+
 ---
 
 ## [0.4.1] — 2026-02-27
