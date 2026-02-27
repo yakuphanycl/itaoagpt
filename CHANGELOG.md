@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.3] — 2026-02-28
+
+### Added
+- `src/itaoagpt/core/fingerprint.py`: new `normalize_message()` pipeline masks
+  UUID / HEX / IPv4 / EMAIL / 2+ digit numbers in deterministic order
+- `tools/release.ps1`: create-or-edit GitHub release with tag/version guard,
+  working-tree cleanliness check, and editable-install guard
+- `tools/contract_tests.ps1`: version + editable install sanity gates
+  (A1: CLI JSON version matches git tag; A2: `importlib.metadata` matches;
+  B: import must come from `src/`, not site-packages)
+
+### Changed
+- `triage.top_fingerprints` is now the single canonical source; root-level
+  `top_fingerprints` and `triage.top_fp` removed
+- Version read from `importlib.metadata.version("itaoagpt")` in engine and
+  log analyzer — no more hardcoded `"0.1.0"` in JSON output
+- Confidence formula documented in-code with threshold table
+- Expected version in contract tests auto-derived from `git describe --tags`
+
+### Fixed
+- BOM (`\ufeff`) stripped from first log line — prevents parse miss on
+  Windows-encoded files
+
+---
+
 ## [0.4.2] — 2026-02-27
 
 ### Added
