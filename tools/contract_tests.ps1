@@ -39,6 +39,7 @@ foreach ($key in @("tool", "version", "schema_version", "created_at", "input_sum
 Assert-True ($r.out -match '"unique_fingerprints"\s*:') "json missing stats.unique_fingerprints"
 Assert-True ($r.out -match '"total"\s*:') "json missing stats.total"
 Assert-True ($r.out -match '"top_fingerprints"\s*:') "json missing stats.top_fingerprints"
+Assert-True ($r.out -match '"confidence_label"\s*:') "json missing triage.confidence_label"
 
 # 2) out.json write
 if (Test-Path .\out.json) { Remove-Item .\out.json -Force }

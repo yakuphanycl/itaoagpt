@@ -1,0 +1,105 @@
+{
+  "by_level": {
+    "CRITICAL": 1,
+    "DEBUG": 0,
+    "ERROR": 2,
+    "INFO": 1,
+    "WARNING": 1
+  },
+  "created_at": "1970-01-01T00:00:00+00:00",
+  "findings": [
+    {
+      "evidence": [
+        "2026-02-24 11:00:01 ERROR db timeout after 2000ms",
+        "2026-02-24 11:00:02 CRITICAL out of memory at 0xDEADBEEF",
+        "2026-02-24 11:00:05 ERROR db timeout after 3000ms"
+      ],
+      "hint": "Ilk gorunen high-severity hatadan baslayip ayni request/trace akisina bak.",
+      "kind": "high_severity_present",
+      "severity": "high",
+      "title": "ERROR/CRITICAL tespit edildi: 3 adet"
+    },
+    {
+      "evidence": [
+        "2026-02-24 11:00:03 WARN retrying"
+      ],
+      "hint": "WARN kayitlari genelde gelecekteki ERROR'larin habercisi olur.",
+      "kind": "medium_severity_present",
+      "severity": "medium",
+      "title": "WARN tespit edildi: 1 adet"
+    }
+  ],
+  "input_summary": {
+    "events": 5,
+    "source": null
+  },
+  "schema_version": "0.1",
+  "stats": {
+    "by_level": {
+      "CRITICAL": 1,
+      "DEBUG": 0,
+      "ERROR": 2,
+      "INFO": 1,
+      "WARNING": 1
+    },
+    "counts": {
+      "unique_fingerprints": 4
+    },
+    "total": 5
+  },
+  "tool": "itaoagpt",
+  "top_fingerprints": [
+    {
+      "count": 2,
+      "fingerprint": "db timeout after <N>ms",
+      "severity": "high"
+    },
+    {
+      "count": 1,
+      "fingerprint": "boot",
+      "severity": "low"
+    },
+    {
+      "count": 1,
+      "fingerprint": "out of memory at <HEX>",
+      "severity": "high"
+    },
+    {
+      "count": 1,
+      "fingerprint": "retrying",
+      "severity": "medium"
+    }
+  ],
+  "triage": {
+    "confidence": 0.4,
+    "confidence_label": "low",
+    "finding_count": 2,
+    "max_severity": "high",
+    "summary": "2 findings | max: high | 5 events | 4 unique patterns",
+    "top_fingerprints": [
+      {
+        "count": 2,
+        "fingerprint": "db timeout after <N>ms",
+        "severity": "high"
+      },
+      {
+        "count": 1,
+        "fingerprint": "boot",
+        "severity": "low"
+      },
+      {
+        "count": 1,
+        "fingerprint": "out of memory at <HEX>",
+        "severity": "high"
+      }
+    ],
+    "top_issues": [
+      "[high] db timeout after <N>ms (2)",
+      "[low] boot (1)",
+      "[high] out of memory at <HEX> (1)"
+    ],
+    "total_events": 5,
+    "unique_fingerprints": 4
+  },
+  "version": "0.1.0"
+}
