@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from typing import Any
+
+_SEV_RANK: dict[str, int] = {"low": 1, "medium": 2, "high": 3}
+
+
+def build_triage(
+    *,
+    stats: dict[str, Any] | None,
+    top_fingerprints: list[dict[str, Any]] | None,
+    findings: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    _stats = stats or {}
+    _fps = top_fingerprints or []
+    _findings = findings or []
+
+    max_sev = "none"
+    for f in _findings:
+        s = (f.get("severity") or "").strip().lower()
+        if s in _SEV_RANK:
+            if max_sev == "none" or _SEV_RANK[s] > _SEV_RANK.get(max_sev, 0):
+                max_sev = s
+
+    counts = _stats.get("counts") or {}
+    total_events = int(_stats.get("total", 0))
+    unique_fps = int(counts.get("unique_fingerprints", 0))
+    finding_count = len(_findings)
+
+    # confidence: based on volume of observed events
+    if total_events == 0:
+        confidence = 0.0
+    elif total_events < 50:
+        confidence = 0.4
+    elif total_events < 500:
+        confidence = 0.7
+    else:
+        confidence = 1.0
+
+    # summary: single-line human label
+    summary = (
+        f"{finding_count} finding{'s' if finding_count != 1 else ''}"
+        f" · max: {max_sev}"
+        f" · {total_events} events"
+        f" · {unique_fps} unique patterns"
+    )
+
+    # top_issues: formatted strings from top_fingerprints
+    top_issues: list[str] = []
+    for t in _fps[:5]:
+        fp = t.get("fingerprint", "?")
+        cnt = t.get("count", 0)
+        sev = t.get("severity", "low")
+        top_issues.append(f"[{sev}] {fp} ({cnt})")
+
+    return {
+        "max_severity": max_sev,
+        "finding_count": finding_count,
+        "total_events": total_events,
+        "unique_fingerprints": unique_fps,
+        "top_fingerprints": _fps[:3],
+        "confidence": confidence,
+        "summary": summary,
+        "top_issues": top_issues,
+    }

@@ -362,39 +362,59 @@ def render_human_from_json(out: dict) -> str:
     # Human output MUST be derived from JSON output (single source of truth)
     inp = out.get("input_summary") or {}
     findings = out.get("findings") or []
+    stats = out.get("stats") or {}
+    counts = stats.get("counts") or {}
 
     lines = []
+
+    # 1. Header
     lines.append("ItaoaGPT")
+
+    # 2. Events / Source
     lines.append(f"Events: {inp.get('events')}")
     lines.append(f"Source: {inp.get('source')}")
-    lines.append("")
-    lines.append(f"Findings: {len(findings)}")
 
-    for i, f in enumerate(findings, 1):
-        sev = f.get("severity")
-        title = f.get("title")
-        lines.append(f"{i}. [{sev}] {title}")
+    # 3. Unique issues
+    uniq = counts.get("unique_fingerprints")
+    if uniq is not None:
+        lines.append(f"Unique issues: {uniq}")
 
-    unique_line = _human_unique_issues(out)
-    if unique_line:
-        lines.append("")
-        lines.append(unique_line)
-
-    stats = out.get("stats") or {}
+    # 4. By level
     by_level = stats.get("by_level") or out.get("by_level") or {}
     if by_level:
         order = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         parts = [f"{k}={int(by_level.get(k, 0))}" for k in order]
         lines.append("By level: " + " ".join(parts))
 
-    tops = out.get("top_fingerprints") or []
-    if tops:
-        parts = []
-        for t in tops[:5]:
-            fp = t.get("fingerprint", "?")
-            cnt = t.get("count", 0)
-            parts.append(f"{fp} ({cnt})")
-        lines.append("Top issues: " + ", ".join(parts))
+    # 5. Findings
+    lines.append("")
+    lines.append(f"Findings: {len(findings)}")
+    for i, f in enumerate(findings, 1):
+        sev = f.get("severity")
+        title = f.get("title")
+        lines.append(f"{i}. [{sev}] {title}")
+
+    # 6. Summary / Confidence / Top issues
+    lines.append("")
+    triage = out.get("triage")
+    if triage:
+        lines.append(f"Summary: {triage.get('summary', '')}")
+        lines.append(f"Confidence: {triage.get('confidence', '')}")
+        top_issues = triage.get("top_issues") or []
+        if top_issues:
+            lines.append("Top issues:")
+            for issue in top_issues:
+                lines.append(f"  {issue}")
+    else:
+        # fallback: V0.1 path (no triage in out)
+        tops = out.get("top_fingerprints") or []
+        if tops:
+            parts = []
+            for t in tops[:5]:
+                fp = t.get("fingerprint", "?")
+                cnt = t.get("count", 0)
+                parts.append(f"{fp} ({cnt})")
+            lines.append("Top issues: " + ", ".join(parts))
 
     return "\n".join(lines)
 
