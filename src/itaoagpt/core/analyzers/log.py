@@ -144,6 +144,8 @@ def analyze_log(
     by_level: Counter[str] = Counter()
     fp_counter: Counter[str] = Counter()
     fp_sev: dict[str, str] = {}
+    fp_sample: dict[str, str] = {}
+    fp_levels: dict[str, Counter[str]] = {}
 
     for line in events:
         level, msg = _extract_level_and_message(line)
@@ -160,6 +162,11 @@ def analyze_log(
         fp_counter[fp] += 1
         prev = fp_sev.get(fp)
         fp_sev[fp] = sev if prev is None else _max_sev([prev, sev])
+        if fp not in fp_sample:
+            fp_sample[fp] = line
+        if fp not in fp_levels:
+            fp_levels[fp] = Counter()
+        fp_levels[fp][level] += 1
 
         if sev == "high":
             high_hits.append(line)
@@ -212,6 +219,8 @@ def analyze_log(
             "fingerprint": fp,
             "count": int(cnt),
             "severity": sev,
+            "sample": fp_sample.get(fp, ""),
+            "levels": {k: int(v) for k, v in (fp_levels.get(fp) or Counter()).items()},
         })
 
     if min_severity:

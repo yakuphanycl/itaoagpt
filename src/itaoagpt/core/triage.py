@@ -81,6 +81,16 @@ def build_triage(
 
     actions = _actions_from_issues(top_issues)
 
+    top_fp = [
+        {
+            "fingerprint": t.get("fingerprint", "?"),
+            "count": t.get("count", 0),
+            "severity": t.get("severity", "low"),
+            "sample": t.get("sample", ""),
+        }
+        for t in _fps[:3]
+    ]
+
     return {
         "max_severity": max_sev,
         "finding_count": finding_count,
@@ -91,5 +101,6 @@ def build_triage(
         "confidence_label": confidence_label,
         "summary": summary,
         "top_issues": top_issues,
+        "top_fp": top_fp,
         "actions": actions,
     }
