@@ -58,6 +58,11 @@ Assert-True ($r.out -match "Unique issues:\s+\d+") "human text missing Unique is
 Assert-True ($r.out -match "Top issues:") "human text missing Top issues line"
 Assert-True ($r.out -match "\(\d+\)") "human text missing issue count format"
 
+# --- TEXT OUTPUT CONTRACT (human summary must exist) ---
+$outText = (python -m itaoagpt.cli.main analyze ".\tmp_test.log" --type log --text) -join "`n"
+if ($outText -notmatch "By level:") { throw "missing human summary: By level" }
+if ($outText -notmatch "Top issues:") { throw "missing human summary: Top issues" }
+
 function Get-Json($s) {
   if ($null -eq $s -or $s.Trim().Length -eq 0) {
     throw "Empty JSON output"
