@@ -30,3 +30,5 @@ __pycache__/
 out.json
 out_gate.json
 
+out_before.*
+CLAUDE_RULES.md

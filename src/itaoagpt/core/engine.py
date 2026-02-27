@@ -12,6 +12,7 @@ def run_analysis(
     max_lines: int | None = None,
     min_severity: str | None = None,
     deterministic: bool = False,
+    debug: bool = False,
 ) -> dict[str, Any]:
     """
     Contract-safe analysis router.
@@ -43,5 +44,6 @@ def run_analysis(
         max_lines=max_lines,
         min_severity=min_severity,
         deterministic=deterministic,
+        debug=debug,
     )
 

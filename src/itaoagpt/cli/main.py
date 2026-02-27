@@ -96,21 +96,19 @@ def _filter_findings(findings: list[dict[str, Any]], min_severity: str) -> list[
 
 
 def _human_top_issues(out: dict[str, Any]) -> str | None:
-    stats = out.get("stats") or {}
-    top = stats.get("top_fingerprints") or []
+    top = out.get("top_fingerprints")
+    if top is None:
+        stats = out.get("stats") or {}
+        top = stats.get("top_fingerprints") or []
     if not top:
         return None
 
     items: list[str] = []
     for it in top[:3]:
-        fp = (it.get("fp") or "")
+        fp = (it.get("fingerprint") or it.get("fp") or "")
         cnt = it.get("count", 0)
-        if "|" in fp:
-            _, msg = fp.split("|", 1)
-        else:
-            msg = fp
-        msg = msg.replace("<num>", "N")
-        items.append(f"{msg} ({cnt})")
+        sev = _norm_sev(it.get("severity"))
+        items.append(f"[{sev}] {fp} ({cnt})")
 
     if not items:
         return None
@@ -119,7 +117,10 @@ def _human_top_issues(out: dict[str, Any]) -> str | None:
 
 def _human_unique_issues(out: dict[str, Any]) -> str | None:
     stats = out.get("stats") or {}
-    count = stats.get("unique_fingerprints")
+    counts = stats.get("counts") or {}
+    count = counts.get("unique_fingerprints")
+    if count is None:
+        count = stats.get("unique_fingerprints")
     if count is None:
         return None
     return f"Unique issues: {count}"
@@ -184,6 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_an.add_argument("--json", action="store_true", help="Print JSON output to stdout")
     p_an.add_argument("--text", action="store_true", help="Print human-readable output to stdout")
     p_an.add_argument("--deterministic", action="store_true", help="Deterministic mode for testing/repeatability")
+    p_an.add_argument("--debug", action="store_true", help="Include debug_meta in JSON output (omitted in deterministic mode)")
 
     p_rep = sub.add_parser("report", help="Print a saved JSON report (from --out)")
     p_rep.add_argument("in_json", help="Path to report JSON")
@@ -220,6 +222,7 @@ def cmd_analyze(
     min_severity: str,
     out_path: str | None,
     fail_on: str,
+    debug: bool = False,
 ) -> int:
     p = Path(path_str).expanduser().resolve()
     if not p.exists():
@@ -235,6 +238,7 @@ def cmd_analyze(
         deterministic=deterministic,
         glob=glob,
         max_lines=max_lines,
+        debug=debug,
     )
 
     # default output mode
@@ -404,7 +408,10 @@ def main(argv: list[str] | None = None) -> int:
             glob=args.glob,
             max_lines=args.max_lines,
             min_severity=args.min_severity,
-            out_path=args.out, fail_on=args.fail_on)
+            out_path=args.out,
+            fail_on=args.fail_on,
+            debug=args.debug,
+        )
 
     if args.cmd == "report":
         return cmd_report(
