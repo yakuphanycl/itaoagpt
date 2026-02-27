@@ -124,6 +124,9 @@ Assert-True ($o.stats.total -eq $o.input_summary.lines) "stats.total must equal 
 Assert-True ($o.input_summary.events -le $o.input_summary.lines) "input_summary.events must be <= input_summary.lines"
 Assert-True ((($o.stats.by_level.INFO + $o.stats.by_level.WARNING + $o.stats.by_level.ERROR + $o.stats.by_level.CRITICAL + $o.stats.by_level.DEBUG) -eq $o.input_summary.events)) "by_level total must equal input_summary.events"
 Assert-True ($o.stats.counts.unique_fingerprints -ge 1) "unique_fingerprints must be >= 1"
+Assert-True ($o.triage.actions -is [System.Array]) "triage.actions must be an array"
+$invalidActions = @($o.triage.actions | Where-Object { $_ -isnot [string] -or [string]::IsNullOrWhiteSpace($_) })
+Assert-True ($invalidActions.Count -eq 0) "triage.actions must contain only non-empty strings"
 Assert-True ($o.triage.top_issues.Count -ge 1) "triage.top_issues must be non-empty"
 
 # 2) out.json write

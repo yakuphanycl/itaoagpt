@@ -1,27 +1,27 @@
 from __future__ import annotations
 
-import re
 from typing import Any
 
 _SEV_RANK: dict[str, int] = {"low": 1, "medium": 2, "high": 3}
 
-_ACTION_RULES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"timeout", re.I), "DB timeout/pool/latency kontrolu"),
-    (re.compile(r"out of memory|oom", re.I), "memory limit/leak/payload size"),
-    (re.compile(r"retry", re.I), "upstream instability, backoff/retry policy"),
-    (re.compile(r"connection refused", re.I), "servis ayakta mi? port/firewall"),
-    (re.compile(r"critical", re.I), "crash dump / core / immediate rollback opsiyonu"),
-]
+_ACTION_KEYWORD_MAP: tuple[tuple[str, str], ...] = (
+    ("timeout", "DB timeout/pool/latency kontrolu"),
+    ("out of memory", "memory limit/leak/payload size"),
+    ("oom", "memory limit/leak/payload size"),
+    ("retry", "upstream instability, backoff/retry policy"),
+    ("connection refused", "servis ayakta mi? port/firewall"),
+    ("critical", "crash dump / core / immediate rollback opsiyonu"),
+)
 
 
 def _actions_from_top_fp(top_fp: list[dict[str, Any]]) -> list[str]:
-    """Derive actions from structured top_fp (no string parsing)."""
+    """Derive deterministic actions from keyword->action map."""
     seen: set[str] = set()
     actions: list[str] = []
     for t in top_fp:
-        text = t.get("fingerprint", "")
-        for pattern, action in _ACTION_RULES:
-            if pattern.search(text) and action not in seen:
+        text = str(t.get("fingerprint", "")).lower()
+        for keyword, action in _ACTION_KEYWORD_MAP:
+            if keyword in text and action not in seen:
                 seen.add(action)
                 actions.append(action)
                 if len(actions) == 3:
