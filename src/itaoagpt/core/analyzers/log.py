@@ -147,8 +147,11 @@ def analyze_log(
     fp_sample: dict[str, str] = {}
     fp_levels: dict[str, Counter[str]] = {}
 
+    parsed_events = 0
     for line in events:
         level, msg = _extract_level_and_message(line)
+        if level is not None:
+            parsed_events += 1
         level = level or "INFO"
         if level not in _LEVELS:
             level = "INFO"
@@ -250,7 +253,7 @@ def analyze_log(
         "version": "0.1.0",
         "schema_version": "0.1",
         "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
-        "input_summary": {"lines": total, "events": total, "source": None},
+        "input_summary": {"lines": total, "events": parsed_events, "source": None},
         "by_level": by_level_out,
         "stats": stats,
         "top_fingerprints": top_fingerprints,

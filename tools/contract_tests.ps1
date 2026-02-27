@@ -6,6 +6,25 @@ param(
 # Fail fast: herhangi bir hata scripti dusursun
 $ErrorActionPreference = "Stop"
 
+# --- UTF-8 hygiene (Windows PowerShell 5.1 dahil) ---
+try { chcp 65001 *> $null } catch {}
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = $utf8NoBom
+[Console]::OutputEncoding = $utf8NoBom
+
+function ConvertFrom-JsonStrict {
+  param([string]$Raw)
+
+  # Normalize: trim + BOM temizle
+  $s = $Raw.Trim()
+  $s = $s -replace "^\uFEFF", ""
+
+  # Bazen sonda gorunmeyen null gelebiliyor
+  $s = $s -replace "\u0000", ""
+
+  return ($s | ConvertFrom-Json -ErrorAction Stop)
+}
+
 function Get-Json {
   param(
     [Parameter(Mandatory=$true)]
@@ -13,7 +32,7 @@ function Get-Json {
   )
 
   try {
-    return ($Text | ConvertFrom-Json -Depth 50)
+    return (Parse-JsonStrict $Text)
   } catch {
     throw "ConvertFrom-Json failed. Raw output was:`n$Text"
   }
@@ -78,6 +97,11 @@ Assert-True ($r.out -match '"actions"\s*:') "json missing triage.actions"
 $o = Get-Json $r.out
 Assert-True ($null -ne $o.input_summary.lines) "json missing input_summary.lines"
 Assert-True ($null -ne $o.stats.by_level) "json missing stats.by_level (nested)"
+[void](Assert-HasPath $o "stats.total")
+[void](Assert-HasPath $o "top_fingerprints")
+Assert-True ($o.stats.total -eq $o.input_summary.lines) "stats.total must equal input_summary.lines"
+Assert-True ($o.stats.counts.unique_fingerprints -ge 1) "unique_fingerprints must be >= 1"
+Assert-True ($o.triage.top_issues.Count -ge 1) "triage.top_issues must be non-empty"
 
 # 2) out.json write
 if (Test-Path .\out.json) { Remove-Item .\out.json -Force }
@@ -158,10 +182,10 @@ Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r
 $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
 
-Write-Host "ALL CONTRACT TESTS PASSED ✅" -ForegroundColor Green
+Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
 } catch {
-  Write-Host "Contract tests failed ❌" -ForegroundColor Red
+  Write-Host "Contract tests failed" -ForegroundColor Red
   Write-Host $_.Exception.Message
   exit 1
 }
