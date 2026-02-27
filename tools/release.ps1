@@ -36,18 +36,20 @@ if ($pkgPath -match "\\site-packages\\") {
   throw "Refusing release: itaoagpt imports from site-packages: $pkgPath (run: pip install -e .)"
 }
 
-# 6) Release var mi?
-$exists = $true
-try { gh release view $Tag | Out-Null } catch { $exists = $false }
+# 5) Release var mi? (*> $null: stdout+stderr yut, sadece exit code'a bak)
+gh release view $Tag *> $null
+$exists = ($LASTEXITCODE -eq 0)
 
-# 7) Create veya edit
+# 6) Create veya edit — ciktiyi serbest birak, hatalar gorunsun
 if ($exists) {
-  gh release edit $Tag -t $Title -n $Notes | Out-Null
+  gh release edit $Tag -t $Title -n $Notes
+  if ($LASTEXITCODE -ne 0) { throw "gh release edit failed (rc=$LASTEXITCODE)" }
   Write-Host "[OK] Updated release: $Tag"
 } else {
-  gh release create $Tag -t $Title -n $Notes | Out-Null
+  gh release create $Tag -t $Title -n $Notes
+  if ($LASTEXITCODE -ne 0) { throw "gh release create failed (rc=$LASTEXITCODE)" }
   Write-Host "[OK] Created release: $Tag"
 }
 
-# 8) Son hali goster
+# 7) Son hali goster
 gh release view $Tag
