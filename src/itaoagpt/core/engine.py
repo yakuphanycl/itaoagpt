@@ -1,10 +1,18 @@
 from __future__ import annotations
+
+import importlib.metadata as _imd
+from pathlib import Path
+from typing import Any
+
 from itaoagpt.core.analyzers.log import analyze_log
 from itaoagpt.core.triage import build_triage
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Optional
+
+def _pkg_version() -> str:
+    try:
+        return _imd.version("itaoagpt")
+    except Exception:
+        return "0.4.2"
 def run_analysis(
     path: Path,
     analyzer_type: str = "log",
@@ -29,7 +37,7 @@ def run_analysis(
         # V0: keep it explicit
         return {
             "tool": "itaoagpt",
-            "version": "0.1.0",
+            "version": _pkg_version(),
             "schema_version": "0.1",
             "error": f"unsupported analyzer_type: {analyzer_type} (V0 supports only: log)",
         }
@@ -48,11 +56,15 @@ def run_analysis(
         debug=debug,
     )
 
+    out["version"] = _pkg_version()  # A: single version source (overrides analyzer hardcode)
+
     out["triage"] = build_triage(
         stats=out.get("stats"),
         top_fingerprints=out.get("top_fingerprints"),
         findings=out.get("findings"),
     )
+
+    out.pop("top_fingerprints", None)  # C: canonical home is triage.top_fingerprints
 
     return out
 

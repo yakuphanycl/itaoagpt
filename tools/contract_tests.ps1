@@ -119,7 +119,7 @@ $o = Get-Json $r.out
 Assert-True ($null -ne $o.input_summary.lines) "json missing input_summary.lines"
 Assert-True ($null -ne $o.stats.by_level) "json missing stats.by_level (nested)"
 [void](Assert-HasPath $o "stats.total")
-[void](Assert-HasPath $o "top_fingerprints")
+[void](Assert-HasPath $o "triage.top_fingerprints")
 Assert-True ($o.stats.total -eq $o.input_summary.lines) "stats.total must equal input_summary.lines"
 Assert-True ($o.input_summary.events -le $o.input_summary.lines) "input_summary.events must be <= input_summary.lines"
 Assert-True ((($o.stats.by_level.INFO + $o.stats.by_level.WARNING + $o.stats.by_level.ERROR + $o.stats.by_level.CRITICAL + $o.stats.by_level.DEBUG) -eq $o.input_summary.events)) "by_level total must equal input_summary.events"
@@ -132,8 +132,8 @@ Assert-True ($o.triage.top_issues.Count -ge 1) "triage.top_issues must be non-em
 
 # fingerprint masking: "db timeout after 2000ms" and "db timeout after 3000ms"
 # must collapse to the same masked fingerprint via normalize_message
-$fp_strings = @($o.top_fingerprints | ForEach-Object { $_.fingerprint })
-Assert-True ($fp_strings -contains "db timeout after <N>ms") "top_fingerprints must contain masked fingerprint 'db timeout after <N>ms'"
+$fp_strings = @($o.triage.top_fingerprints | ForEach-Object { $_.fingerprint })
+Assert-True ($fp_strings -contains "db timeout after <N>ms") "triage.top_fingerprints must contain masked fingerprint 'db timeout after <N>ms'"
 
 # 2) out.json write
 if (Test-Path .\out.json) { Remove-Item .\out.json -Force }

@@ -2,11 +2,19 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+import importlib.metadata as _imd
 from pathlib import Path
 import re
 from typing import Any
 
 from itaoagpt.core.fingerprint import normalize_message
+
+
+def _pkg_version() -> str:
+    try:
+        return _imd.version("itaoagpt")
+    except Exception:
+        return "0.4.2"
 
 
 _SEV_RANK = {"low": 1, "medium": 2, "high": 3}
@@ -104,7 +112,7 @@ def analyze_log(
         by_level_out = {k: 0 for k in _LEVELS}
         out: dict[str, Any] = {
             "tool": "itaoagpt",
-            "version": "0.1.0",
+            "version": _pkg_version(),
             "schema_version": "0.1",
             "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
             "input_summary": {"lines": 0, "events": 0, "source": None},
@@ -135,6 +143,8 @@ def analyze_log(
     ms_rank = _SEV_RANK.get(ms, 1)
 
     events = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    if events:
+        events[0] = events[0].lstrip("\ufeff")  # D: strip BOM from first line
     if max_lines is not None and max_lines > 0:
         events = events[: max_lines]
 
@@ -252,7 +262,7 @@ def analyze_log(
 
     result: dict[str, Any] = {
         "tool": "itaoagpt",
-        "version": "0.1.0",
+        "version": _pkg_version(),
         "schema_version": "0.1",
         "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
         "input_summary": {"lines": total, "events": parsed_events, "source": None},

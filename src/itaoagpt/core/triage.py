@@ -14,7 +14,7 @@ _ACTION_KEYWORD_MAP: tuple[tuple[str, str], ...] = (
 )
 
 
-def _actions_from_top_fp(top_fp: list[dict[str, Any]]) -> list[str]:
+def _actions_from_fps(top_fp: list[dict[str, Any]]) -> list[str]:
     """Derive deterministic actions from keyword->action map."""
     seen: set[str] = set()
     actions: list[str] = []
@@ -51,7 +51,11 @@ def build_triage(
     unique_fps = int(counts.get("unique_fingerprints", 0))
     finding_count = len(_findings)
 
-    # confidence: based on volume of observed events
+    # Confidence formula (V0.4+, deterministic — based on observed event volume):
+    #   0 events       -> 0.0 / "none"   — no data
+    #   1–49 events    -> 0.4 / "low"    — too few events for strong conclusions
+    #   50–499 events  -> 0.7 / "medium" — moderate signal
+    #   500+ events    -> 1.0 / "high"   — sufficient volume for pattern analysis
     if total_events == 0:
         confidence = 0.0
         confidence_label = "none"
@@ -73,25 +77,17 @@ def build_triage(
         f" | {unique_fps} unique patterns"
     )
 
-    # top_fp: primary structured field (V0.4+)
-    top_fp = [
-        {
-            "fingerprint": t.get("fingerprint", "?"),
-            "count": t.get("count", 0),
-            "severity": t.get("severity", "low"),
-            "sample": t.get("sample", ""),
-        }
-        for t in _fps[:3]
-    ]
+    # top_fingerprints: canonical structured field (V0.4+)
+    top_fps = _fps[:3]
 
-    # actions derived from top_fp (structured — no string parsing)
-    actions = _actions_from_top_fp(top_fp)
+    # actions derived from top_fingerprints (keyword matching — no string parsing of raw lines)
+    actions = _actions_from_fps(top_fps)
 
     # top_issues: formatted strings for human display
-    # DEPRECATED: primary as of V0.4, deprecated in V0.5, removal candidate in V1.0
+    # DEPRECATED: removal candidate V1.0 — use top_fingerprints
     top_issues: list[str] = [
-        f"[{t['severity']}] {t['fingerprint']} ({t['count']})"
-        for t in top_fp
+        f"[{t.get('severity', 'low')}] {t.get('fingerprint', '?')} ({t.get('count', 0)})"
+        for t in top_fps
     ]
 
     return {
@@ -99,11 +95,10 @@ def build_triage(
         "finding_count": finding_count,
         "total_events": total_events,
         "unique_fingerprints": unique_fps,
-        "top_fingerprints": _fps[:3],
         "confidence": confidence,
         "confidence_label": confidence_label,
         "summary": summary,
-        "top_fp": top_fp,           # primary (V0.4+)
-        "top_issues": top_issues,   # deprecated V0.5, removal candidate V1.0
+        "top_fingerprints": top_fps,  # canonical (V0.4+)
+        "top_issues": top_issues,     # deprecated: use top_fingerprints; removal candidate V1.0
         "actions": actions,
     }
