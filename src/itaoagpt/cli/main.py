@@ -380,9 +380,21 @@ def render_human_from_json(out: dict) -> str:
         lines.append("")
         lines.append(unique_line)
 
-    top_line = _human_top_issues(out)
-    if top_line:
-        lines.append(top_line)
+    stats = out.get("stats") or {}
+    by_level = stats.get("by_level") or out.get("by_level") or {}
+    if by_level:
+        order = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        parts = [f"{k}={int(by_level.get(k, 0))}" for k in order]
+        lines.append("By level: " + " ".join(parts))
+
+    tops = out.get("top_fingerprints") or []
+    if tops:
+        parts = []
+        for t in tops[:5]:
+            fp = t.get("fingerprint", "?")
+            cnt = t.get("count", 0)
+            parts.append(f"{fp} ({cnt})")
+        lines.append("Top issues: " + ", ".join(parts))
 
     return "\n".join(lines)
 
