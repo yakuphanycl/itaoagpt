@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+from itaoagpt.core.fingerprint import normalize_message
+
 
 _SEV_RANK = {"low": 1, "medium": 2, "high": 3}
 _LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
@@ -161,7 +163,7 @@ def analyze_log(
 
         by_level[level] += 1
 
-        fp = _fingerprint_text(msg)
+        fp = normalize_message(msg)
         fp_counter[fp] += 1
         prev = fp_sev.get(fp)
         fp_sev[fp] = sev if prev is None else _max_sev([prev, sev])

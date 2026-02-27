@@ -130,6 +130,11 @@ $invalidActions = @($o.triage.actions | Where-Object { $_ -isnot [string] -or [s
 Assert-True ($invalidActions.Count -eq 0) "triage.actions must contain only non-empty strings"
 Assert-True ($o.triage.top_issues.Count -ge 1) "triage.top_issues must be non-empty"
 
+# fingerprint masking: "db timeout after 2000ms" and "db timeout after 3000ms"
+# must collapse to the same masked fingerprint via normalize_message
+$fp_strings = @($o.top_fingerprints | ForEach-Object { $_.fingerprint })
+Assert-True ($fp_strings -contains "db timeout after <N>ms") "top_fingerprints must contain masked fingerprint 'db timeout after <N>ms'"
+
 # 2) out.json write
 if (Test-Path .\out.json) { Remove-Item .\out.json -Force }
 $r = Run "$Runner analyze `"$Log`" --type log --json --out .\out.json"
