@@ -30,11 +30,17 @@ if ($Tag -ne $expectedTag) {
   throw "Tag '$Tag' does not match pyproject.toml version '$pkgVersion' (expected tag: $expectedTag)"
 }
 
-# 4) Release var mi?
+# 4) Editable install mi? (site-packages'ten release etme)
+$pkgPath = (python -c "import itaoagpt; print(itaoagpt.__file__)" 2>&1 | Out-String).Trim()
+if ($pkgPath -match "\\site-packages\\") {
+  throw "Refusing release: itaoagpt imports from site-packages: $pkgPath (run: pip install -e .)"
+}
+
+# 6) Release var mi?
 $exists = $true
 try { gh release view $Tag | Out-Null } catch { $exists = $false }
 
-# 5) Create veya edit
+# 7) Create veya edit
 if ($exists) {
   gh release edit $Tag -t $Title -n $Notes | Out-Null
   Write-Host "[OK] Updated release: $Tag"
@@ -43,5 +49,5 @@ if ($exists) {
   Write-Host "[OK] Created release: $Tag"
 }
 
-# 6) Son hali goster
+# 8) Son hali goster
 gh release view $Tag

@@ -104,6 +104,24 @@ $r = Run "$Runner version"
 Assert-True ($r.rc -eq 0) "version rc != 0"
 Assert-True ($r.out -match '"tool"\s*:\s*"itaoagpt"') "version json missing tool"
 
+# --- install / version sanity gates ---
+# expected version auto-derived from latest git tag (v0.4.2 -> 0.4.2)
+$tag = (git describe --tags --abbrev=0 2>&1 | Out-String).Trim()
+$expected = $tag.TrimStart("v")
+
+# gate A1: CLI JSON version must match tag
+$jv = Get-Json $r.out
+Assert-True ($jv.version -eq $expected) "version.json must be $expected (got $($jv.version))"
+
+# gate A2: importlib.metadata must match tag
+$metaVer = (python -c "import importlib.metadata as m; print(m.version('itaoagpt'))" 2>&1 | Out-String).Trim()
+Assert-True ($metaVer -eq $expected) "metadata version must be $expected (got $metaVer)"
+
+# gate B: must import from repo (editable), not site-packages
+$pkgPath = (python -c "import itaoagpt; print(itaoagpt.__file__)" 2>&1 | Out-String).Trim()
+Assert-True ($pkgPath -notmatch "\\site-packages\\") "itaoagpt imported from site-packages: $pkgPath"
+Assert-True ($pkgPath -match "\\src\\itaoagpt\\__init__\.py$") "itaoagpt must import from src: $pkgPath"
+
 # 1) analyze json
 $r = Run "$Runner analyze `"$Log`" --type log --json"
 Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r.rc)"
