@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.5.1] — 2026-02-28
+
+### Changed
+- Removed stale `.bak_*` backup files from `tools/` directory
+
+---
+
 ## [0.5.0] — 2026-02-28
 
 Minor version milestone — consolidates all 0.4.x work into a stable baseline.
