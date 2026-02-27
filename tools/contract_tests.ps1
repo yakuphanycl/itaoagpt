@@ -13,29 +13,35 @@ $OutputEncoding = $utf8NoBom
 [Console]::OutputEncoding = $utf8NoBom
 
 function ConvertFrom-JsonStrict {
-  param([string]$Raw)
+  param(
+    [Parameter(Mandatory=$true)]
+    [object]$Raw
+  )
 
-  # Normalize: trim + BOM temizle
-  $s = $Raw.Trim()
-  $s = $s -replace "^\uFEFF", ""
+  # CLI output bazen string[] donebilir -> tek stringe indir
+  if ($Raw -is [System.Array]) {
+    $text = ($Raw -join "`n")
+  } else {
+    $text = [string]$Raw
+  }
 
-  # Bazen sonda gorunmeyen null gelebiliyor
-  $s = $s -replace "\u0000", ""
+  # guvenlik: gorunmez karakterleri temizle
+  $text = $text.TrimStart([char]0xFEFF) -replace "`0", ""
 
-  return ($s | ConvertFrom-Json -ErrorAction Stop)
+  try {
+    return $text | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "ConvertFrom-Json failed. Raw output was:`n$text"
+  }
 }
 
 function Get-Json {
   param(
     [Parameter(Mandatory=$true)]
-    [string] $Text
+    [object] $Text
   )
 
-  try {
-    return (Parse-JsonStrict $Text)
-  } catch {
-    throw "ConvertFrom-Json failed. Raw output was:`n$Text"
-  }
+  return (ConvertFrom-JsonStrict $Text)
 }
 
 function Assert-HasPath {
@@ -100,6 +106,8 @@ Assert-True ($null -ne $o.stats.by_level) "json missing stats.by_level (nested)"
 [void](Assert-HasPath $o "stats.total")
 [void](Assert-HasPath $o "top_fingerprints")
 Assert-True ($o.stats.total -eq $o.input_summary.lines) "stats.total must equal input_summary.lines"
+Assert-True ($o.input_summary.events -le $o.input_summary.lines) "input_summary.events must be <= input_summary.lines"
+Assert-True ((($o.stats.by_level.INFO + $o.stats.by_level.WARNING + $o.stats.by_level.ERROR + $o.stats.by_level.CRITICAL + $o.stats.by_level.DEBUG) -eq $o.input_summary.events)) "by_level total must equal input_summary.events"
 Assert-True ($o.stats.counts.unique_fingerprints -ge 1) "unique_fingerprints must be >= 1"
 Assert-True ($o.triage.top_issues.Count -ge 1) "triage.top_issues must be non-empty"
 

@@ -150,9 +150,9 @@ def analyze_log(
     parsed_events = 0
     for line in events:
         level, msg = _extract_level_and_message(line)
-        if level is not None:
-            parsed_events += 1
-        level = level or "INFO"
+        if level is None:
+            continue
+        parsed_events += 1
         if level not in _LEVELS:
             level = "INFO"
 
