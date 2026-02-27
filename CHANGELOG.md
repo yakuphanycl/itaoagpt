@@ -27,6 +27,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - BOM (`\ufeff`) stripped from first log line — prevents parse miss on
   Windows-encoded files
+- `release.ps1`: `| Out-Null` was silently swallowing `gh` errors; fixed with
+  `$LASTEXITCODE` check
 
 ---
 
