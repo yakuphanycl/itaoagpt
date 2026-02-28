@@ -16,32 +16,31 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Create test log (CI fixture)
-        shell: pwsh
-        run: |
-          @"
-          2026-02-24 11:00:00 INFO boot
-          2026-02-24 11:00:01 WARN cache miss
-          2026-02-24 11:00:02 ERROR db timeout after 2000ms
-          2026-02-24 11:00:03 INFO retry
-          2026-02-24 11:00:04 CRITICAL out of memory
-          "@ | Set-Content -LiteralPath .\tmp_test.log -Encoding UTF8
-
       - name: Install (editable)
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e .
 
-      - name: Run release_check (fast)
+      - name: Contract tests (fast)
         shell: pwsh
         run: |
-          .\tools\release_check.ps1
+          .\tools\contract_tests.ps1
 
-      - name: Run release_check (wheel gate)
+      - name: Create test log (wheel gate fixture)
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         shell: pwsh
-        env:
-          WHEEL: "1"
+        run: |
+          @'
+          2026-02-24 11:00:00 INFO boot
+          2026-02-24 11:00:01 WARN cache miss
+          2026-02-24 11:00:02 ERROR db timeout after 2000ms
+          2026-02-24 11:00:03 INFO retry
+          2026-02-24 11:00:04 CRITICAL out of memory
+          '@ | Set-Content -LiteralPath .\tmp_test.log -Encoding utf8
+
+      - name: Release check (wheel gate)
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
         run: |
           .\tools\release_check.ps1
