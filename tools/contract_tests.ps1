@@ -87,6 +87,7 @@ function Run($cmd) {
 
 try {
 $Runner = Resolve-Runner
+$Py     = ($Runner -split ' ')[0]   # python executable derived from Runner
 
 # Repo root'tan çalıştırma sözleşmesi
 if (-not (Test-Path ".\pyproject.toml")) {
@@ -118,11 +119,11 @@ $jv = Get-Json $r.out
 Assert-True ($jv.version -eq $expected) "version.json must be $expected (got $($jv.version))"
 
 # gate A2: importlib.metadata must match tag
-$metaVer = (python -c "import importlib.metadata as m; print(m.version('itaoagpt'))" 2>&1 | Out-String).Trim()
+$metaVer = (& $Py -c "import importlib.metadata as m; print(m.version('itaoagpt'))" 2>&1 | Out-String).Trim()
 Assert-True ($metaVer -eq $expected) "metadata version must be $expected (got $metaVer)"
 
 # gate B: must import from repo (editable), not site-packages
-$pkgPath = (python -c "import itaoagpt; print(itaoagpt.__file__)" 2>&1 | Out-String).Trim()
+$pkgPath = (& $Py -c "import itaoagpt; print(itaoagpt.__file__)" 2>&1 | Out-String).Trim()
 Assert-True ($pkgPath -notmatch "\\site-packages\\") "itaoagpt imported from site-packages: $pkgPath"
 Assert-True ($pkgPath -match "\\src\\itaoagpt\\__init__\.py$") "itaoagpt must import from src: $pkgPath"
 
@@ -176,7 +177,7 @@ Assert-True ($r.out -match "Top issues:") "human text missing Top issues line"
 Assert-True ($r.out -match "\(\d+\)") "human text missing issue count format"
 
 # --- TEXT OUTPUT CONTRACT (human summary must exist) ---
-$outText = (python -m itaoagpt.cli.main analyze "$log" --type log --text) -join "`n"
+$outText = (Invoke-Expression "$Runner analyze `"$log`" --type log --text") -join "`n"
 if ($outText -notmatch "By level:") { throw "missing human summary: By level" }
 if ($outText -notmatch "Top issues:") { throw "missing human summary: Top issues" }
 
@@ -237,8 +238,8 @@ $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
 
 # --- A3: version consistency gate (CLI vs metadata) ---
-$cliVer = (python -m itaoagpt.cli.main version | ConvertFrom-Json).version
-$metaVer = (python -c "import importlib.metadata as imd; print(imd.version('itaoagpt'))" | Out-String).Trim()
+$cliVer = (Invoke-Expression "$Runner version" | ConvertFrom-Json).version
+$metaVer = (& $Py -c "import importlib.metadata as imd; print(imd.version('itaoagpt'))" | Out-String).Trim()
 Assert ($cliVer -eq $metaVer) "version mismatch: cli=$cliVer metadata=$metaVer"
 
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
