@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.1] — 2026-02-28
+
+### Fixed
+- `src/itaoagpt/__init__.py`: eliminated stale hardcoded `__version__ = "0.5.0"`;
+  now derived from `importlib.metadata` — same source as the CLI `version` command
+
+### Added
+- `README.md`: JSON Contract v0.7.0 table documenting guaranteed output fields
+
+---
+
 ## [0.7.0] — 2026-02-28
 
 ### Added
