@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.8.1] — 2026-02-28
+
+### Changed
+- Version bump; release_check.ps1 passed clean on v0.8.0 codebase
+
+---
+
 ## [0.8.0] — 2026-02-28
 
 ### Added
