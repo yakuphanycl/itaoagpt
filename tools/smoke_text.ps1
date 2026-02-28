@@ -45,9 +45,14 @@ if ($acts -match '(?i)retry') {
 }
 
 # --- fail-on exit code ---
+# Temporarily allow non-zero exit so $LASTEXITCODE is readable before PS7 propagates it
+$ErrorActionPreference = "Continue"
 Invoke-Expression "$Runner analyze `"$log`" --type log --text --fail-on high" *> $null
-if ($LASTEXITCODE -eq 0) {
+$failRc = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+if ($failRc -eq 0) {
   throw "TEXT CI: fail-on high expected non-zero exit, got 0"
 }
 
 Write-Host "[OK] TEXT smoke OK" -ForegroundColor Green
+exit 0
