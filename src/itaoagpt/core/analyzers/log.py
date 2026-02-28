@@ -95,6 +95,7 @@ def analyze_log(
     path: Path,
     deterministic: bool = False,
     *,
+    lines: list[str] | None = None,
     max_lines: int | None = None,
     min_severity: str | None = None,
     debug: bool = False,
@@ -102,47 +103,51 @@ def analyze_log(
     """
     V0 log analyzer.
 
-    - Reads a log file (best-effort parsing).
+    - Reads a log file (best-effort parsing), or accepts pre-read lines (stdin).
     - Supports max_lines safety cap.
     - Supports min_severity filtering for findings.
     """
-    p = Path(path)
-
-    if not p.exists():
-        by_level_out = {k: 0 for k in _LEVELS}
-        out: dict[str, Any] = {
-            "tool": "itaoagpt",
-            "version": _pkg_version(),
-            "schema_version": "0.1",
-            "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
-            "input_summary": {"lines": 0, "events": 0, "source": None},
-            "by_level": by_level_out,
-            "stats": {
-                "total": 0,
-                "by_level": by_level_out,
-                "counts": {
-                    "unique_fingerprints": 0,
-                },
-            },
-            "top_fingerprints": [],
-            "findings": [
-                {
-                    "kind": "input_error",
-                    "severity": "high",
-                    "title": f"log file not found: {str(p)}",
-                    "evidence": [],
-                    "hint": "Verilen path dogru mu? Dosya gercekten var mi?",
-                }
-            ],
-        }
-        if debug and not deterministic:
-            out["debug_meta"] = {"lines_read": 0, "min_severity": None}
-        return out
-
     ms = (min_severity or "low").strip().lower()
     ms_rank = _SEV_RANK.get(ms, 1)
 
-    events = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    source: str | None
+    if lines is not None:
+        events = list(lines)
+        source = "<stdin>"
+    else:
+        p = Path(path)
+        if not p.exists():
+            by_level_out = {k: 0 for k in _LEVELS}
+            out: dict[str, Any] = {
+                "tool": "itaoagpt",
+                "version": _pkg_version(),
+                "schema_version": "0.1",
+                "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
+                "input_summary": {"lines": 0, "events": 0, "source": None},
+                "by_level": by_level_out,
+                "stats": {
+                    "total": 0,
+                    "by_level": by_level_out,
+                    "counts": {
+                        "unique_fingerprints": 0,
+                    },
+                },
+                "top_fingerprints": [],
+                "findings": [
+                    {
+                        "kind": "input_error",
+                        "severity": "high",
+                        "title": f"log file not found: {str(p)}",
+                        "evidence": [],
+                        "hint": "Verilen path dogru mu? Dosya gercekten var mi?",
+                    }
+                ],
+            }
+            if debug and not deterministic:
+                out["debug_meta"] = {"lines_read": 0, "min_severity": None}
+            return out
+        events = p.read_text(encoding="utf-8", errors="replace").splitlines()
+        source = None
     if events:
         events[0] = events[0].lstrip("\ufeff")  # D: strip BOM from first line
     if max_lines is not None and max_lines > 0:
@@ -265,7 +270,7 @@ def analyze_log(
         "version": _pkg_version(),
         "schema_version": "0.1",
         "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
-        "input_summary": {"lines": total, "events": parsed_events, "source": None},
+        "input_summary": {"lines": total, "events": parsed_events, "source": source},
         "by_level": by_level_out,
         "stats": stats,
         "top_fingerprints": top_fingerprints,

@@ -224,17 +224,24 @@ def cmd_analyze(
     fail_on: str,
     debug: bool = False,
 ) -> int:
-    p = Path(path_str).expanduser().resolve()
-    if not p.exists():
-        print(f"[ERR] path not found: {p}", file=sys.stderr)
-        return 2
-
     # lazy import so `version` never depends on engine
     from itaoagpt.core.engine import run_analysis
+
+    stdin_lines: list[str] | None = None
+    if path_str == "-":
+        raw = sys.stdin.buffer.read().decode("utf-8", errors="replace")
+        stdin_lines = raw.splitlines()
+        p = Path("<stdin>")
+    else:
+        p = Path(path_str).expanduser().resolve()
+        if not p.exists():
+            print(f"[ERR] path not found: {p}", file=sys.stderr)
+            return 2
 
     result = run_analysis(
         path=p,
         analyzer_type=atype,
+        lines=stdin_lines,
         deterministic=deterministic,
         glob=glob,
         max_lines=max_lines,

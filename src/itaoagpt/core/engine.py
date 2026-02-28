@@ -17,6 +17,7 @@ def run_analysis(
     path: Path,
     analyzer_type: str = "log",
     *,
+    lines: list[str] | None = None,
     glob: str | None = None,
     max_lines: int | None = None,
     min_severity: str | None = None,
@@ -50,6 +51,7 @@ def run_analysis(
     # If analyze_log does not accept these yet, adapt here.
     out = analyze_log(
         p,
+        lines=lines,
         max_lines=max_lines,
         min_severity=min_severity,
         deterministic=deterministic,

@@ -242,6 +242,16 @@ $cliVer = (Invoke-Expression "$Runner version" | ConvertFrom-Json).version
 $metaVer = (& $Py -c "import importlib.metadata as imd; print(imd.version('itaoagpt'))" | Out-String).Trim()
 Assert ($cliVer -eq $metaVer) "version mismatch: cli=$cliVer metadata=$metaVer"
 
+# --- stdin gate: pipe log content to 'analyze -' and verify JSON output ---
+$runnerBase = $Runner -split ' '
+$stdinArgs  = $runnerBase[1..($runnerBase.Count - 1)] + @('analyze', '-', '--type', 'log', '--json')
+$stdinOut   = (Get-Content -LiteralPath $log -Encoding utf8 | & $Py @stdinArgs) -join "`n"
+$stdinJson  = ConvertFrom-JsonStrict $stdinOut
+Assert-True ($null -ne $stdinJson) "stdin: JSON parse failed"
+Assert-True ($stdinJson.input_summary.source -eq "<stdin>") "stdin: source must be '<stdin>' (got $($stdinJson.input_summary.source))"
+Assert-True ($stdinJson.input_summary.lines -ge 1) "stdin: input_summary.lines must be >= 1"
+Assert-True ($null -ne $stdinJson.triage) "stdin: triage must be present"
+
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
 } catch {

@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.0] — 2026-02-28
+
+### Added
+- `itaoagpt analyze -` stdin support: pipe log content directly into the CLI
+  (`cat app.log | itaoagpt analyze - --type log --json`)
+- `input_summary.source` reports `"<stdin>"` when reading from stdin
+- Contract test stdin gate: verifies `source`, `lines`, and `triage` fields
+
+---
+
 ## [0.5.1] — 2026-02-28
 
 Patch release — release tooling hardened for repeatable CI/local runs.
