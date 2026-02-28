@@ -64,6 +64,7 @@ def run_analysis(
         stats=out.get("stats"),
         top_fingerprints=out.get("top_fingerprints"),
         findings=out.get("findings"),
+        loose_events=int((out.get("input_summary") or {}).get("loose_events", 0)),
     )
 
     out.pop("top_fingerprints", None)  # C: canonical home is triage.top_fingerprints

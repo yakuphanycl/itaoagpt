@@ -34,6 +34,7 @@ def build_triage(
     stats: dict[str, Any] | None,
     top_fingerprints: list[dict[str, Any]] | None,
     findings: list[dict[str, Any]] | None,
+    loose_events: int = 0,
 ) -> dict[str, Any]:
     _stats = stats or {}
     _fps = top_fingerprints or []
@@ -79,6 +80,9 @@ def build_triage(
         confidence = 1.0
         confidence_label = "high"
         confidence_reasons = [f"sufficient volume: {total_events} events"]
+
+    if loose_events > 0:
+        confidence_reasons.append(f"parsed via loose pattern (no timestamp): {loose_events} events")
 
     # summary: single-line human label (ASCII separators for terminal safety)
     summary = (

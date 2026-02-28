@@ -291,6 +291,29 @@ if ($t.triage.severity_counts.high -gt 0) {
   Assert ($hasHighFinding) "smoke: expected findings to include kind=high_severity_present when severity_counts.high > 0"
 }
 
+# --- loose_events field gate (normal log → 0; field must always exist) ---
+Assert-True ($null -ne $o.input_summary.loose_events -or $o.input_summary.loose_events -eq 0) "input_summary.loose_events must exist"
+Assert-True ([int]$o.input_summary.loose_events -ge 0) "input_summary.loose_events must be >= 0"
+
+# --- loose parser gate: timestamp-less lines with level keyword are parsed ---
+$looseLog = Join-Path (Get-Location).Path "tmp_loose.log"
+@'
+2026-02-24 11:00:00 INFO boot ok
+2026 ERROR db timeout after 3000ms
+ERROR out of memory
+some random line without a level
+'@ | Set-Content -LiteralPath $looseLog -Encoding utf8
+$looseOut  = (Invoke-Expression "$Runner analyze `"$looseLog`" --type log --json") -join "`n"
+$looseJson = ConvertFrom-JsonStrict $looseOut
+Assert-True ($looseJson.input_summary.lines -eq 4)        "loose: lines must be 4"
+Assert-True ($looseJson.input_summary.events -eq 3)       "loose: events must be 3 (1 strict + 2 loose)"
+Assert-True ($looseJson.input_summary.loose_events -eq 2) "loose: loose_events must be 2"
+Assert-True ($looseJson.triage.confidence_reasons -match "loose pattern") "loose: confidence_reasons must mention loose pattern"
+# fingerprint engine must produce a fingerprint for the timestamp-less ERROR line
+$looseFps = $looseJson.triage.top_fingerprints | ForEach-Object { $_.fingerprint }
+Assert-True ($looseFps -contains "db timeout after <N>ms") "loose: fingerprint 'db timeout after <N>ms' must be present"
+Remove-Item -LiteralPath $looseLog -Force
+
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
 } catch {

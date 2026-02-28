@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.8.0] — 2026-02-28
+
+### Added
+- Two-layer log parser:
+  - **Layer A (strict)**: existing `timestamp + level + message` format
+  - **Layer B (loose)**: lines without timestamps are matched by `ERROR|WARN|CRITICAL|FATAL` keyword; fingerprint engine still applies
+- `input_summary.loose_events`: count of lines parsed via loose fallback
+- `triage.confidence_reasons` now includes `"parsed via loose pattern (no timestamp): N events"` when loose parsing occurred
+- Contract test: `loose_events` field gate + dedicated loose-parse log test (fingerprint, event count, confidence_reasons)
+
+---
+
 ## [0.7.1] — 2026-02-28
 
 ### Fixed

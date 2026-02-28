@@ -26,6 +26,7 @@ _RE_HEX = re.compile(r"\b0x[0-9a-fA-F]+\b")
 _RE_UUID = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
 _RE_IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _RE_WS = re.compile(r"\s+")
+_RE_LOOSE_LEVEL = re.compile(r"\b(ERROR|WARN(?:ING)?|CRITICAL|FATAL)\b", re.IGNORECASE)
 
 
 def _now_iso() -> str:
@@ -76,6 +77,23 @@ def _normalize_level(level: str | None) -> str | None:
     elif norm == "FATAL":
         norm = "CRITICAL"
     return norm if norm in _LEVELS else None
+
+
+def _loose_extract(line: str) -> tuple[str | None, str]:
+    """
+    Layer B fallback: timestamp olmasa bile ERROR/WARN/CRITICAL içeriyorsa yakala.
+    Örnek: "2026 ERROR db timeout after 3000ms"
+    """
+    m = _RE_LOOSE_LEVEL.search(line)
+    if not m:
+        return None, line.strip()
+    level = _normalize_level(m.group(1))
+    if level is None:
+        return None, line.strip()
+    msg = line[m.end():].strip()
+    if not msg:
+        msg = line.strip()
+    return level, msg
 
 
 def _extract_level_and_message(line: str) -> tuple[str | None, str]:
@@ -165,11 +183,21 @@ def analyze_log(
     fp_levels: dict[str, Counter[str]] = {}
 
     parsed_events = 0
+    loose_events = 0
     for line in events:
+        # Layer A — strict: timestamp + level + message
         level, msg = _extract_level_and_message(line)
+        parsed_loose = False
+        # Layer B — fallback: keyword anywhere in line, no timestamp required
+        if level is None:
+            level, msg = _loose_extract(line)
+            if level is not None:
+                parsed_loose = True
         if level is None:
             continue
         parsed_events += 1
+        if parsed_loose:
+            loose_events += 1
         if level not in _LEVELS:
             level = "INFO"
 
@@ -270,7 +298,7 @@ def analyze_log(
         "version": _pkg_version(),
         "schema_version": "0.1",
         "created_at": "1970-01-01T00:00:00+00:00" if deterministic else _now_iso(),
-        "input_summary": {"lines": total, "events": parsed_events, "source": source},
+        "input_summary": {"lines": total, "events": parsed_events, "loose_events": loose_events, "source": source},
         "by_level": by_level_out,
         "stats": stats,
         "top_fingerprints": top_fingerprints,
