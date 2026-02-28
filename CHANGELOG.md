@@ -10,6 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - Removed stale `.bak_*` backup files from `tools/` directory
 
+### Fixed
+- `contract_tests.ps1`: hardcoded `python` calls replaced with `$Py` derived
+  from `$Runner` — tests now respect the active venv regardless of PATH order
+
 ---
 
 ## [0.5.0] — 2026-02-28
