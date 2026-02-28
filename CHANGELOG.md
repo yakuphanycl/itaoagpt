@@ -7,12 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.5.1] — 2026-02-28
 
-### Changed
-- Removed stale `.bak_*` backup files from `tools/` directory
+Patch release — release tooling hardened for repeatable CI/local runs.
 
-### Fixed
-- `contract_tests.ps1`: hardcoded `python` calls replaced with `$Py` derived
-  from `$Runner` — tests now respect the active venv regardless of PATH order
+### Changes
+- `tools/release_check.ps1`: replaced `pip show build` check with `pip install build -q` (idempotent, no crash on missing dep).
+- `tools/contract_tests.ps1`: ensured wheel smoke tests run gates using the wheel venv interpreter (`.venv_wheel_test` Python), preventing PATH / interpreter drift.
+
+### Why this matters
+These changes make release verification more deterministic across machines and CI by removing dependency on global pip state and guaranteeing tests run against the intended environment.
 
 ---
 
