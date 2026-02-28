@@ -27,6 +27,11 @@ jobs:
         run: |
           .\tools\contract_tests.ps1
 
+      - name: TEXT smoke test
+        shell: pwsh
+        run: |
+          .\tools\smoke_text.ps1
+
       - name: Create test log (wheel gate fixture)
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         shell: pwsh
