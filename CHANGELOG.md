@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.0] — 2026-02-28
+
+### Added
+- Directory scan: `itaoagpt analyze /path/to/dir/ --glob "*.log"` aggregates
+  multiple files into a single report
+- `input_summary.files`: number of files scanned in directory mode
+- Contract test: directory scan gate (2-file temp dir, `files` + `lines` + `source` asserts)
+
+### Fixed
+- CI: fast job now runs `contract_tests.ps1` (no wheel build); wheel build
+  only on `main`/tags via `release_check.ps1`
+
+---
+
 ## [0.8.1] — 2026-02-28
 
 ### Changed

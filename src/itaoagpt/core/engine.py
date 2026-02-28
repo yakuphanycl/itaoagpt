@@ -13,6 +13,25 @@ def _pkg_version() -> str:
         return _imd.version("itaoagpt")
     except Exception:
         return "0.4.2"
+
+
+def _scan_directory(
+    path: Path,
+    glob_pattern: str,
+    max_lines: int | None,
+) -> tuple[list[str], int]:
+    """Collect lines from all matching files in a directory (sorted for determinism)."""
+    files = sorted(f for f in path.glob(glob_pattern) if f.is_file())
+    all_lines: list[str] = []
+    for f in files:
+        file_lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        all_lines.extend(file_lines)
+        if max_lines is not None and max_lines > 0 and len(all_lines) >= max_lines:
+            all_lines = all_lines[:max_lines]
+            break
+    return all_lines, len(files)
+
+
 def run_analysis(
     path: Path,
     analyzer_type: str = "log",
@@ -43,12 +62,13 @@ def run_analysis(
             "error": f"unsupported analyzer_type: {analyzer_type} (V0 supports only: log)",
         }
 
-    # For now, treat `path` as a file path; directory+glob can be implemented later.
-    # We keep `glob` in signature to match CLI contract and avoid TypeError.
     p = Path(path)
+    dir_file_count: int | None = None
 
-    # Delegate to log analyzer.
-    # If analyze_log does not accept these yet, adapt here.
+    # Directory scan: collect lines from all matching files, pass as lines=
+    if lines is None and p.is_dir():
+        lines, dir_file_count = _scan_directory(p, glob or "*.log", max_lines)
+
     out = analyze_log(
         p,
         lines=lines,
@@ -57,6 +77,10 @@ def run_analysis(
         deterministic=deterministic,
         debug=debug,
     )
+
+    if dir_file_count is not None:
+        out["input_summary"]["files"] = dir_file_count
+        out["input_summary"]["source"] = None  # directory scan, not stdin
 
     out["version"] = _pkg_version()  # A: single version source (overrides analyzer hardcode)
 

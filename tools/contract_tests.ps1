@@ -314,6 +314,25 @@ $looseFps = $looseJson.triage.top_fingerprints | ForEach-Object { $_.fingerprint
 Assert-True ($looseFps -contains "db timeout after <N>ms") "loose: fingerprint 'db timeout after <N>ms' must be present"
 Remove-Item -LiteralPath $looseLog -Force
 
+# --- directory scan gate ---
+$dirPath = Join-Path (Get-Location).Path "tmp_scandir"
+$null = New-Item -ItemType Directory -Force -Path $dirPath
+@'
+2026-02-24 11:00:00 INFO boot
+2026-02-24 11:00:01 ERROR db timeout after 2000ms
+'@ | Set-Content -LiteralPath (Join-Path $dirPath "a.log") -Encoding utf8
+@'
+2026-02-24 11:00:02 CRITICAL out of memory
+2026-02-24 11:00:03 WARN retrying
+'@ | Set-Content -LiteralPath (Join-Path $dirPath "b.log") -Encoding utf8
+$dirOut  = (Invoke-Expression "$Runner analyze `"$dirPath`" --glob `"*.log`" --type log --json") -join "`n"
+$dirJson = ConvertFrom-JsonStrict $dirOut
+Assert-True ($dirJson.input_summary.files -eq 2)  "dirscan: input_summary.files must be 2"
+Assert-True ($dirJson.input_summary.lines -eq 4)  "dirscan: input_summary.lines must be 4"
+Assert-True ($dirJson.input_summary.source -eq $null) "dirscan: source must be null"
+Assert-True ($null -ne $dirJson.triage)            "dirscan: triage must be present"
+Remove-Item -Recurse -Force $dirPath
+
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
 } catch {
