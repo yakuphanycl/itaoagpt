@@ -51,6 +51,13 @@ def build_triage(
     unique_fps = int(counts.get("unique_fingerprints", 0))
     finding_count = len(_findings)
 
+    # severity_counts: finding-level severity breakdown (CI-friendly numeric fields)
+    severity_counts: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+    for f in _findings:
+        s = (f.get("severity") or "low").strip().lower()
+        if s in severity_counts:
+            severity_counts[s] += 1
+
     # Confidence formula (V0.4+, deterministic — based on observed event volume):
     #   0 events       -> 0.0 / "none"   — no data
     #   1–49 events    -> 0.4 / "low"    — too few events for strong conclusions
@@ -59,15 +66,19 @@ def build_triage(
     if total_events == 0:
         confidence = 0.0
         confidence_label = "none"
+        confidence_reasons: list[str] = ["no data: 0 events"]
     elif total_events < 50:
         confidence = 0.4
         confidence_label = "low"
+        confidence_reasons = [f"low sample size: {total_events} events (threshold: 50)"]
     elif total_events < 500:
         confidence = 0.7
         confidence_label = "medium"
+        confidence_reasons = [f"moderate sample: {total_events} events (threshold: 500)"]
     else:
         confidence = 1.0
         confidence_label = "high"
+        confidence_reasons = [f"sufficient volume: {total_events} events"]
 
     # summary: single-line human label (ASCII separators for terminal safety)
     summary = (
@@ -95,8 +106,10 @@ def build_triage(
         "finding_count": finding_count,
         "total_events": total_events,
         "unique_fingerprints": unique_fps,
+        "severity_counts": severity_counts,
         "confidence": confidence,
         "confidence_label": confidence_label,
+        "confidence_reasons": confidence_reasons,
         "summary": summary,
         "top_fingerprints": top_fps,  # canonical (V0.4+)
         "top_issues": top_issues,     # deprecated: use top_fingerprints; removal candidate V1.0

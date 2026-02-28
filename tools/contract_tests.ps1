@@ -252,6 +252,45 @@ Assert-True ($stdinJson.input_summary.source -eq "<stdin>") "stdin: source must 
 Assert-True ($stdinJson.input_summary.lines -ge 1) "stdin: input_summary.lines must be >= 1"
 Assert-True ($null -ne $stdinJson.triage) "stdin: triage must be present"
 
+# --- triage new fields gate ---
+$triage = $o.triage
+[void](Assert-HasPath $o "triage.severity_counts")
+Assert-True ($null -ne $triage.severity_counts.high)   "triage.severity_counts.high must exist"
+Assert-True ($null -ne $triage.severity_counts.medium) "triage.severity_counts.medium must exist"
+Assert-True ($null -ne $triage.severity_counts.low)    "triage.severity_counts.low must exist"
+[void](Assert-HasPath $o "triage.confidence_reasons")
+Assert-True ($triage.confidence_reasons -is [System.Array])  "triage.confidence_reasons must be an array"
+Assert-True ($triage.confidence_reasons.Count -ge 1)         "triage.confidence_reasons must be non-empty"
+
+# --- stdin smoke test: full structural contract for 'analyze -' ---
+# $stdinOut / $stdinJson already captured in stdin gate above
+$t = $stdinJson
+Assert ($t.tool -eq "itaoagpt")                                     "smoke: tool must be itaoagpt"
+Assert ($t.schema_version)                                          "smoke: schema_version missing"
+Assert ($t.input_summary.source -eq "<stdin>")                      "smoke: input_summary.source must be <stdin>"
+Assert ($t.input_summary.lines -ge 1)                               "smoke: input_summary.lines must be >= 1"
+Assert ($t.input_summary.events -ge 1)                              "smoke: input_summary.events must be >= 1"
+Assert ($t.stats.total -eq $t.input_summary.lines)                  "smoke: stats.total must equal input_summary.lines"
+Assert ($t.by_level.ERROR -eq $t.stats.by_level.ERROR)              "smoke: by_level.ERROR must equal stats.by_level.ERROR"
+Assert ($t.by_level.CRITICAL -eq $t.stats.by_level.CRITICAL)        "smoke: by_level.CRITICAL must equal stats.by_level.CRITICAL"
+# severity_counts lives in triage (not stats)
+Assert ($null -ne $t.triage.severity_counts)                        "smoke: triage.severity_counts missing"
+Assert ($t.triage.severity_counts.high -ge 0)                       "smoke: triage.severity_counts.high must be >= 0"
+Assert ($t.triage.severity_counts.medium -ge 0)                     "smoke: triage.severity_counts.medium must be >= 0"
+Assert ($t.triage.severity_counts.low -ge 0)                        "smoke: triage.severity_counts.low must be >= 0"
+Assert ($null -ne $t.triage)                                        "smoke: triage missing"
+Assert ($t.triage.total_events -eq $t.input_summary.lines)          "smoke: triage.total_events must equal input_summary.lines"
+Assert ($t.triage.unique_fingerprints -eq $t.stats.counts.unique_fingerprints) "smoke: triage.unique_fingerprints must equal stats.counts.unique_fingerprints"
+Assert ($t.triage.summary)                                          "smoke: triage.summary missing"
+# if any high-severity finding exists, kind=high_severity_present must be present
+if ($t.triage.severity_counts.high -gt 0) {
+  $hasHighFinding = $false
+  foreach ($f in $t.findings) {
+    if ($f.kind -eq "high_severity_present") { $hasHighFinding = $true; break }
+  }
+  Assert ($hasHighFinding) "smoke: expected findings to include kind=high_severity_present when severity_counts.high > 0"
+}
+
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
 } catch {

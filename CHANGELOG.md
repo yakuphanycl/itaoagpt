@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0] — 2026-02-28
+
+### Added
+- `triage.severity_counts`: `{high: N, medium: N, low: N}` — CI-friendly numeric finding breakdown
+- `triage.confidence_reasons`: list of strings explaining the confidence tier
+  (e.g. `["low sample size: 3 events (threshold: 50)"]`)
+- Contract test: `triage.severity_counts` and `triage.confidence_reasons` gate
+- Stdin smoke test block: full structural contract for `analyze -` output
+
+---
+
 ## [0.6.0] — 2026-02-28
 
 ### Added
