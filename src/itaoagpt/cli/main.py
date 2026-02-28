@@ -245,6 +245,7 @@ def cmd_analyze(
         deterministic=deterministic,
         glob=glob,
         max_lines=max_lines,
+        min_severity=min_severity,
         debug=debug,
     )
 
@@ -290,7 +291,8 @@ def cmd_analyze(
         sys.stdout.buffer.write((data + "\n").encode("utf-8"))
     if as_text:
         # Human output MUST be derived from JSON output (single source of truth)
-        print(render_human_from_json(out2))
+        from itaoagpt.core.render_text import render_text_ci
+        print(render_text_ci(out2))
 
     fail_on = (fail_on or "").strip().lower()
     if fail_on in ("none", "off", "false", "0") or fail_on not in SEV_RANK:

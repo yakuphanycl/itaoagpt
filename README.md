@@ -38,6 +38,8 @@ Fields guaranteed to be present in every `analyze --json` response:
 
 Fields are **additive-only** — existing fields will not be removed or renamed in minor versions.
 
+`--min-severity` filters both `findings` and triage summary/actions (top_fingerprints, top_issues, actions).
+
 ### Quality gate
 Run this before releases:
 ```powershell

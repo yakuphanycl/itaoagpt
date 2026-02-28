@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.2] — 2026-02-28
+
+### Added
+- `--min-severity` now filters `triage.top_fingerprints`, `top_issues`, and `actions` (not only `findings`)
+- `src/itaoagpt/core/render_text.py`: `render_text_ci()` — CI-friendly deterministic key=value text renderer; `analyze --text` now uses this renderer
+- `tools/smoke_text.ps1`: standalone TEXT CI smoke test (marker gates, deterministic check, min-severity leak, fail-on rc)
+- Contract tests: `--help` golden path gate; TEXT CI marker assertions (`(?m)\b` pattern)
+
+---
+
 ## [0.9.1] — 2026-02-28
 
 ### Changed

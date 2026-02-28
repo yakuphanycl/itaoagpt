@@ -35,9 +35,14 @@ def build_triage(
     top_fingerprints: list[dict[str, Any]] | None,
     findings: list[dict[str, Any]] | None,
     loose_events: int = 0,
+    min_severity: str = "low",
 ) -> dict[str, Any]:
     _stats = stats or {}
-    _fps = top_fingerprints or []
+    _min_rank = _SEV_RANK.get((min_severity or "low").strip().lower(), 1)
+    _fps = [
+        fp for fp in (top_fingerprints or [])
+        if _SEV_RANK.get((fp.get("severity") or "low").strip().lower(), 1) >= _min_rank
+    ]
     _findings = findings or []
 
     max_sev = "none"

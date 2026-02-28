@@ -127,6 +127,13 @@ $pkgPath = (& $Py -c "import itaoagpt; print(itaoagpt.__file__)" 2>&1 | Out-Stri
 Assert-True ($pkgPath -notmatch "\\site-packages\\") "itaoagpt imported from site-packages: $pkgPath"
 Assert-True ($pkgPath -match "\\src\\itaoagpt\\__init__\.py$") "itaoagpt must import from src: $pkgPath"
 
+# 0.1) --help golden path
+$r = Run "$Runner analyze --help"
+Assert-True ($r.rc -eq 0) "--help must exit 0"
+Assert-True ($r.out -match '--min-severity') "--help must document --min-severity"
+Assert-True ($r.out -match '--fail-on') "--help must document --fail-on"
+Assert-True ($r.out -match '--json') "--help must document --json"
+
 # 1) analyze json
 $r = Run "$Runner analyze `"$Log`" --type log --json"
 Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r.rc)"
@@ -172,14 +179,22 @@ Assert-True ($r.out -match "Findings:\s+\d+") "report text missing Findings coun
 # 3.1) human text contract
 $r = Run "$Runner analyze `"$Log`" --type log --text"
 Assert-True ($r.rc -eq 0) "analyze --text rc != 0"
-Assert-True ($r.out -match "Unique issues:\s+\d+") "human text missing Unique issues line"
-Assert-True ($r.out -match "Top issues:") "human text missing Top issues line"
-Assert-True ($r.out -match "\(\d+\)") "human text missing issue count format"
+Assert-True ($r.out -match "unique=\d+") "human text missing unique= line"
+Assert-True ($r.out -match "top_issue\.") "human text missing top_issue. entries"
+Assert-True ($r.out -match "top_issue\.\d+\.count=\d+") "human text missing top_issue.N.count= format"
+
+# TEXT CI marker gates: marker var mı yok mu (satır pozisyonu değil)
+$out = $r.out
+Assert ($out -match "(?m)\bfile=")             "TEXT CI missing: file="
+Assert ($out -match "(?m)\blines=\d+")         "TEXT CI missing: lines="
+Assert ($out -match "(?m)\bevents=\d+")        "TEXT CI missing: events="
+Assert ($out -match "(?m)\bresult\.findings=") "TEXT CI missing: result.findings="
+Assert ($out -match "(?m)\bby_level\.ERROR=")  "TEXT CI missing: by_level.ERROR="
 
 # --- TEXT OUTPUT CONTRACT (human summary must exist) ---
 $outText = (Invoke-Expression "$Runner analyze `"$log`" --type log --text") -join "`n"
-if ($outText -notmatch "By level:") { throw "missing human summary: By level" }
-if ($outText -notmatch "Top issues:") { throw "missing human summary: Top issues" }
+if ($outText -notmatch "by_level\.") { throw "missing human summary: by_level" }
+if ($outText -notmatch "top_issue\.") { throw "missing human summary: top_issue" }
 
 function Get-FindingSeverities($outObj) {
   if (-not $outObj.findings) { return @() }
@@ -196,6 +211,12 @@ $sevs = Get-FindingSeverities $o
 Assert-True ($sevs -contains "high") "min-severity high should include high"
 Assert-True (-not ($sevs -contains "medium")) "min-severity high findings should NOT include medium"
 Assert-True (-not ($sevs -contains "low")) "min-severity high findings should NOT include low"
+
+# triage must also respect min-severity high
+$highTopIssues = @($o.triage.top_issues)
+Assert-True (-not ($highTopIssues | Where-Object { $_ -match "\[medium\]" })) "min-severity high: triage.top_issues must not contain [medium]"
+$highActions = @($o.triage.actions)
+Assert-True (-not ($highActions | Where-Object { $_ -match "upstream instability" })) "min-severity high: triage.actions must not include retry/upstream action"
 
 # --- min-severity medium ---
 $r = Run "$Runner analyze `"$Log`" --type log --json --min-severity medium"
@@ -332,6 +353,11 @@ Assert-True ($dirJson.input_summary.lines -eq 4)  "dirscan: input_summary.lines 
 Assert-True ($dirJson.input_summary.source -eq $null) "dirscan: source must be null"
 Assert-True ($null -ne $dirJson.triage)            "dirscan: triage must be present"
 Remove-Item -Recurse -Force $dirPath
+
+# --- TEXT Smoke Test ---
+Write-Host "==> TEXT smoke test" -ForegroundColor Cyan
+& pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke_text.ps1 -Runner $Runner
+if ($LASTEXITCODE -ne 0) { throw "TEXT smoke test failed (rc=$LASTEXITCODE)" }
 
 Write-Host "ALL CONTRACT TESTS PASSED OK" -ForegroundColor Green
 exit 0
