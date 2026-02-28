@@ -17,8 +17,8 @@ try {
   Say "python=$py"
 
   Say "==> ensure build installed"
-  python -m pip show build *> $null
-  if ($LASTEXITCODE -ne 0) { python -m pip install build }
+  python -m pip install build -q
+  if ($LASTEXITCODE -ne 0) { throw "pip install build failed" }
 
   Say "==> clean dist/"
   if (Test-Path ".\dist") { Remove-Item -Recurse -Force ".\dist" }
