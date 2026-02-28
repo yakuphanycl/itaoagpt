@@ -7,11 +7,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.9.2] — 2026-02-28
 
+Contract/Behavior hardening release — no new CLI flags, no breaking changes.
+
 ### Added
-- `--min-severity` now filters `triage.top_fingerprints`, `top_issues`, and `actions` (not only `findings`)
-- `src/itaoagpt/core/render_text.py`: `render_text_ci()` — CI-friendly deterministic key=value text renderer; `analyze --text` now uses this renderer
-- `tools/smoke_text.ps1`: standalone TEXT CI smoke test (marker gates, deterministic check, min-severity leak, fail-on rc)
-- Contract tests: `--help` golden path gate; TEXT CI marker assertions (`(?m)\b` pattern)
+- `render_text_ci()` in `src/itaoagpt/core/render_text.py`: CI-friendly deterministic
+  key=value text renderer; `analyze --text` now uses this renderer
+- `tools/smoke_text.ps1`: standalone TEXT CI smoke test — marker-based (`(?m)\b`
+  pattern, no line-start requirement), deterministic check, min-severity leak check,
+  fail-on exit code check
+- Contract tests: `--help` golden path gate (rc=0 + key flags documented)
+- Contract tests: TEXT CI marker assertions with `(?m)\b` — stable across future
+  format changes as long as markers exist
+
+### Fixed
+- `--min-severity` now consistently filters `triage.top_fingerprints`, `top_issues`,
+  and `actions` — values below threshold no longer leak into triage (verified in
+  contract + smoke tests)
+- CI robustness: TEXT output execution context in PowerShell uses `Invoke-Expression`
+  + `$Runner` parameter, avoiding `<…>` token interpretation issues in subprocess
+
+### Upgrade note
+- No breaking CLI flags
+- TEXT output (`--text`) is soft-stable; CI pipelines should rely on `--json` or
+  marker-based assertions — not line positions or exact string format
 
 ---
 
