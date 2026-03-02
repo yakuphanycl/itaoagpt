@@ -80,7 +80,7 @@ def run_analysis(
 
     if dir_file_count is not None:
         out["input_summary"]["files"] = dir_file_count
-        out["input_summary"]["source"] = None  # directory scan, not stdin
+        out["input_summary"]["source"] = "dir:" + str(p)  # directory scan
 
     out["version"] = _pkg_version()  # A: single version source (overrides analyzer hardcode)
 
@@ -95,4 +95,5 @@ def run_analysis(
     out.pop("top_fingerprints", None)  # C: canonical home is triage.top_fingerprints
 
     return out
+
 

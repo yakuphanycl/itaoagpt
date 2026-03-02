@@ -165,7 +165,7 @@ def analyze_log(
                 out["debug_meta"] = {"lines_read": 0, "min_severity": None}
             return out
         events = p.read_text(encoding="utf-8", errors="replace").splitlines()
-        source = None
+        source = str(p)
     if events:
         events[0] = events[0].lstrip("\ufeff")  # D: strip BOM from first line
     if max_lines is not None and max_lines > 0:
@@ -307,3 +307,4 @@ def analyze_log(
     if debug and not deterministic:
         result["debug_meta"] = {"lines_read": total, "min_severity": ms}
     return result
+

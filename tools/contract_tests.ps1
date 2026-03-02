@@ -258,6 +258,10 @@ Assert-True ($r.rc -eq 0) "analyze (informational) must return rc=0, got rc=$($r
 $r = Run "$Runner analyze `"$Log`" --type log --json --fail-on high"
 Assert-True ($r.rc -eq 2) "analyze --fail-on high must return rc=2"
 
+# 6) rc=1 on user errors (path not found)
+$r = Run "$Runner analyze .\__nonexistent_path_itaoagpt__.log --type log"
+Assert-True ($r.rc -eq 1) "path-not-found must return rc=1, got rc=$($r.rc)"
+
 # --- A3: version consistency gate (CLI vs metadata) ---
 $cliVer = (Invoke-Expression "$Runner version" | ConvertFrom-Json).version
 $metaVer = (& $Py -c "import importlib.metadata as imd; print(imd.version('itaoagpt'))" | Out-String).Trim()
@@ -350,9 +354,20 @@ $dirOut  = (Invoke-Expression "$Runner analyze `"$dirPath`" --glob `"*.log`" --t
 $dirJson = ConvertFrom-JsonStrict $dirOut
 Assert-True ($dirJson.input_summary.files -eq 2)  "dirscan: input_summary.files must be 2"
 Assert-True ($dirJson.input_summary.lines -eq 4)  "dirscan: input_summary.lines must be 4"
-Assert-True ($dirJson.input_summary.source -eq $null) "dirscan: source must be null"
+Assert-True ($dirJson.input_summary.source -match '^dir:' ) "dirscan: source must start with dir:"
 Assert-True ($null -ne $dirJson.triage)            "dirscan: triage must be present"
 Remove-Item -Recurse -Force $dirPath
+
+# 7) --format table smoke
+Write-Host "==> --format table smoke" -ForegroundColor Cyan
+$r = Run "$Runner analyze `"$Log`" --type log --text --format table"
+Assert-True ($r.rc -eq 0) "table format rc != 0, got $($r.rc)"
+Assert-True ($r.out.Trim()) "table format output is empty"
+Assert-True ($r.out -match "By level") "table format missing 'By level' section"
+
+# guard: default plain output header unchanged
+$r = Run "$Runner analyze `"$Log`" --type log --text"
+Assert-True ($r.out -match "^itaoagpt v") "default text: header must start with 'itaoagpt v'"
 
 # --- TEXT Smoke Test ---
 Write-Host "==> TEXT smoke test" -ForegroundColor Cyan
@@ -366,3 +381,5 @@ exit 0
   Write-Host $_.Exception.Message
   exit 1
 }
+
+
