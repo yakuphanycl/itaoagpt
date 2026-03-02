@@ -32,3 +32,13 @@ out_gate.json
 
 out_before.*
 CLAUDE_RULES.md
+
+# local MCP server config (may contain credentials)
+.mcp.json
+
+# Claude Code backup directories
+.claude.backup-*/
+
+# local log/output artifacts
+app.log
+out_text.txt

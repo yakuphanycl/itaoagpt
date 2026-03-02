@@ -1,0 +1,82 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit",
+      "MultiEdit",
+      "Write",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(pytest:*)",
+      "Bash(black:*)",
+      "Bash(isort:*)",
+      "Bash(flake8:*)",
+      "Bash(mypy:*)",
+      "Bash(django-admin:*)",
+      "Bash(flask:*)",
+      "Bash(uvicorn:*)",
+      "Bash(gunicorn:*)",
+      "Bash(git:*)"
+    ],
+    "deny": [
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(rm:*)"
+    ],
+    "defaultMode": "plan"
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "60000",
+    "BASH_MAX_OUTPUT_LENGTH": "20000",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "PYTHONPATH": "."
+  },
+  "includeCoAuthoredBy": true,
+  "cleanupPeriodDays": 30,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$inputJson = [Console]::In.ReadToEnd(); if (-not $inputJson.Trim()) { exit 0 }; $payload = ConvertFrom-Json -InputObject $inputJson; $file = $payload.tool_input.file_path; if ($file -and $file -match '\\.py$') { python -m black $file; python -m isort $file }\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$msg = 'Claude Code notification: ' + (Get-Date).ToString(); Add-Content -Path ($home + '\\.claude\\notifications.log') -Value $msg\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -Command '$files = @(git diff --name-only --diff-filter=ACMR | Where-Object { $_ -match \"\\.py$\" }); if ($files.Count -gt 0) { python -m flake8 $files }'",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -Command '$files = @(git diff --name-only --diff-filter=ACMR | Where-Object { $_ -match \"\\.py$\" }); if ($files.Count -gt 0) { python -m mypy $files }'",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
