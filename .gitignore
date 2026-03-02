@@ -42,3 +42,6 @@ CLAUDE_RULES.md
 # local log/output artifacts
 app.log
 out_text.txt
+
+.claude/settings.local.json
+
