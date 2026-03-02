@@ -19,8 +19,12 @@ pwsh .\tools\contract_tests.ps1
 - This is enforced by `tools/contract_tests.ps1` and `tools/release_check.ps1`.
 
 ### Exit codes
-- `0` = success
-- `2` = contract/validation failure (e.g., `--fail-on`, invalid args, missing file)
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success — analysis complete, no `--fail-on` threshold breached |
+| `1` | User error — path not found, unreadable file, bad arguments |
+| `2` | Fail-on triggered — analysis succeeded, findings meet or exceed `--fail-on` threshold |
 
 ### JSON Contract: v0.7.0
 
