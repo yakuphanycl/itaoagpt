@@ -184,6 +184,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_an.add_argument("--out", default=None, help="Write JSON report to a file")
     p_an.add_argument("--json", action="store_true", help="Print JSON output to stdout")
     p_an.add_argument("--text", action="store_true", help="Print human-readable output to stdout")
+    p_an.add_argument(
+        "--format",
+        choices=["plain", "table"],
+        default="plain",
+        help="Text output style: plain (CI key=value, default) | table (Unicode box)",
+    )
     p_an.add_argument("--deterministic", action="store_true", help="Deterministic mode for testing/repeatability")
     p_an.add_argument("--debug", action="store_true", help="Include debug_meta in JSON output (omitted in deterministic mode)")
 
@@ -223,6 +229,7 @@ def cmd_analyze(
     out_path: str | None,
     fail_on: str,
     debug: bool = False,
+    fmt: str = "plain",
 ) -> int:
     # lazy import so `version` never depends on engine
     from itaoagpt.core.engine import run_analysis
@@ -232,11 +239,13 @@ def cmd_analyze(
         raw = sys.stdin.buffer.read().decode("utf-8", errors="replace")
         stdin_lines = raw.splitlines()
         p = Path("<stdin>")
+        if not stdin_lines:
+            print("[INFO] empty input: no lines received", file=sys.stderr)
     else:
         p = Path(path_str).expanduser().resolve()
         if not p.exists():
             print(f"[ERR] path not found: {p}", file=sys.stderr)
-            return 2
+            return 1
 
     result = run_analysis(
         path=p,
@@ -291,8 +300,17 @@ def cmd_analyze(
         sys.stdout.buffer.write((data + "\n").encode("utf-8"))
     if as_text:
         # Human output MUST be derived from JSON output (single source of truth)
-        from itaoagpt.core.render_text import render_text_ci
-        print(render_text_ci(out2))
+        if fmt == "table":
+            from itaoagpt.core.render_text import render_text_table
+
+            text_out = render_text_table(out2)
+        else:
+            from itaoagpt.core.render_text import render_text_ci
+
+            text_out = render_text_ci(out2)
+        if stdin_lines is not None and len(stdin_lines) == 0:
+            text_out = "(note: empty input — 0 lines received)\n" + text_out
+        print(text_out)
 
     fail_on = (fail_on or "").strip().lower()
     if fail_on in ("none", "off", "false", "0") or fail_on not in SEV_RANK:
@@ -325,14 +343,14 @@ def cmd_report(in_json: str, as_json: bool, as_text: bool, min_severity: str, fa
     p = Path(in_json).expanduser().resolve()
     if not p.exists():
         print(f"[ERR] report json not found: {p}", file=sys.stderr)
-        return 2
+        return 1
 
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
         print(f"[ERR] failed to parse json: {p}", file=sys.stderr)
         print(str(e), file=sys.stderr)
-        return 2
+        return 1
 
     if not as_json and not as_text:
         as_text = True
@@ -463,6 +481,7 @@ def main(argv: list[str] | None = None) -> int:
             out_path=args.out,
             fail_on=args.fail_on,
             debug=args.debug,
+            fmt=args.format,
         )
 
     if args.cmd == "report":
@@ -473,7 +492,7 @@ def main(argv: list[str] | None = None) -> int:
             min_severity=args.min_severity, fail_on=args.fail_on)
 
     print("[ERR] unknown command", file=sys.stderr)
-    return 2
+    return 1
 
 
 if __name__ == "__main__":
